@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'vitest';
+import { probeEmeSupport } from '@/platform/emeProbe';
+import { resolveRedirectUri } from '@/platform/redirectUri';
+import { WebCryptoIndexedDbVault } from '@/platform/tokenVault';
+
+describe('Platform Security, Redirect URI Rules & EME Probing', () => {
+  it('encrypts secrets in WebCryptoIndexedDbVault and never stores plaintext bytes', async () => {
+    const vault = new WebCryptoIndexedDbVault();
+    await vault.clearAll();
+
+    const secretToken = 'AQD_super_sensitive_refresh_token_value_998877';
+    await vault.setSecret('spotify_refresh_token', secretToken);
+
+    const rawEnvelope = await vault.inspectRawEnvelopeForTesting('spotify_refresh_token');
+    expect(rawEnvelope).toBeDefined();
+    expect(rawEnvelope?.iv).toHaveLength(12);
+
+    const rawBytesAsText = new TextDecoder().decode(rawEnvelope?.ciphertext);
+    expect(rawBytesAsText).not.toContain('super_sensitive_refresh_token');
+
+    const roundTrip = await vault.getSecret('spotify_refresh_token');
+    expect(roundTrip).toBe(secretToken);
+
+    await vault.deleteSecret('spotify_refresh_token');
+    expect(await vault.getSecret('spotify_refresh_token')).toBeNull();
+  });
+
+  it('enforces Spotify 2026 Redirect URI rules (rejects localhost, accepts 127.0.0.1 and https)', () => {
+    const localhostCheck = resolveRedirectUri({
+      protocol: 'http:',
+      hostname: 'localhost',
+      port: '5173',
+      origin: 'http://localhost:5173',
+    });
+    expect(localhostCheck.valid).toBe(false);
+    expect(localhostCheck.uri).toBe('http://127.0.0.1:5173/auth/callback');
+
+    const loopbackCheck = resolveRedirectUri({
+      protocol: 'http:',
+      hostname: '127.0.0.1',
+      port: '5173',
+      origin: 'http://127.0.0.1:5173',
+    });
+    expect(loopbackCheck.valid).toBe(true);
+    expect(loopbackCheck.uri).toBe('http://127.0.0.1:5173/auth/callback');
+
+    const insecureLanCheck = resolveRedirectUri({
+      protocol: 'http:',
+      hostname: '192.168.1.25',
+      port: '5173',
+      origin: 'http://192.168.1.25:5173',
+    });
+    expect(insecureLanCheck.valid).toBe(false);
+
+    const httpsPwaCheck = resolveRedirectUri({
+      protocol: 'https:',
+      hostname: 'pulse.example.org',
+      port: '',
+      origin: 'https://pulse.example.org',
+    });
+    expect(httpsPwaCheck.valid).toBe(true);
+    expect(httpsPwaCheck.uri).toBe('https://pulse.example.org/auth/callback');
+  });
+
+  it('gracefully falls back to Connect Remote Control when EME/Widevine is unavailable', async () => {
+    const missingEme = await probeEmeSupport({} as Pick<Navigator, 'requestMediaKeySystemAccess'>);
+    expect(missingEme.supported).toBe(false);
+    expect(missingEme.fallbackMode).toBe('connect-remote-only');
+
+    const supportedEme = await probeEmeSupport({
+      requestMediaKeySystemAccess: () => Promise.resolve({} as MediaKeySystemAccess),
+    });
+    expect(supportedEme.supported).toBe(true);
+    expect(supportedEme.keySystem).toBe('com.widevine.alpha');
+    expect(supportedEme.fallbackMode).toBe('sdk');
+  });
+});

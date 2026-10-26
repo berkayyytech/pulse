@@ -1,0 +1,13 @@
+{
+  "name": "create-pulse-plugin",
+  "version": "0.1.0",
+  "description": "CLI scaffold generator for sandboxed Pulse plugins",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "create-pulse-plugin": "./src/index.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

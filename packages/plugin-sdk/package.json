@@ -1,0 +1,21 @@
+{
+  "name": "@pulse/plugin-sdk",
+  "version": "0.1.0",
+  "description": "Versioned TypeScript SDK for sandboxed Pulse plugins",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "zod": "^3.24.0"
+  }
+}

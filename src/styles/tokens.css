@@ -1,0 +1,142 @@
+:root,
+[data-theme='dark'] {
+  /* Core Palette Tokens */
+  --pulse-color-bg-canvas: #12151e;
+  --pulse-color-bg-halo: #272d3d;
+  --pulse-color-panel-solid: #171b26;
+  --pulse-color-bg-surface: rgba(255, 255, 255, 0.08);
+  --pulse-color-bg-elevated: rgba(255, 255, 255, 0.16);
+  --pulse-color-bg-glass: rgba(24, 26, 38, 0.86);
+  --pulse-color-border-subtle: rgba(255, 255, 255, 0.14);
+  --pulse-color-border-strong: rgba(255, 255, 255, 0.28);
+
+  --pulse-color-text-primary: #ffffff;
+  --pulse-color-text-secondary: rgba(255, 255, 255, 0.66);
+  --pulse-color-text-muted: rgba(255, 255, 255, 0.46);
+  --pulse-color-text-inverse: #11131a;
+
+  --pulse-color-accent: #ffffff;
+  --pulse-color-accent-hover: rgba(255, 255, 255, 0.88);
+  --pulse-color-accent-soft: rgba(255, 255, 255, 0.18);
+  --pulse-color-signal: #34c759;
+  --pulse-color-signal-soft: rgba(52, 199, 89, 0.2);
+  --pulse-color-warning: #febc2e;
+  --pulse-color-danger: #ff5f57;
+  --pulse-color-danger-soft: rgba(255, 95, 87, 0.18);
+
+  /* Range Slider Tokens */
+  --pulse-color-slider-track: rgba(255, 255, 255, 0.22);
+  --pulse-color-slider-thumb: #ffffff;
+
+  /* Ambient Blobs */
+  --pulse-color-blob-1: rgba(94, 92, 230, 0.62);
+  --pulse-color-blob-2: rgba(255, 55, 95, 0.56);
+
+  /* Glass Fill & Specular Rim */
+  --pulse-glass-fill-start: rgba(255, 255, 255, 0.175);
+  --pulse-glass-fill-end: rgba(255, 255, 255, 0.045);
+  --pulse-glass-edge-start: rgba(255, 255, 255, 0.55);
+  --pulse-glass-edge-mid: rgba(255, 255, 255, 0.08);
+  --pulse-glass-edge-end: rgba(255, 255, 255, 0.3);
+
+  /* Typography */
+  --pulse-font-display: 'Segoe UI Variable Display', 'Inter', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', system-ui, sans-serif;
+  --pulse-font-sans: 'Segoe UI Variable Text', 'Segoe UI Variable Display', 'Inter', -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --pulse-font-mono: 'JetBrains Mono', 'Cascadia Code', ui-monospace, SFMono-Regular, monospace;
+  --pulse-ui-font-size: 14px;
+
+  /* Radii & Spacing */
+  --pulse-radius-sm: 11px;
+  --pulse-radius-md: 16px;
+  --pulse-radius-lg: 28px;
+  --pulse-radius-art: 30px;
+  --pulse-radius-pill: 9999px;
+
+  --pulse-space-1: 0.25rem;
+  --pulse-space-2: 0.5rem;
+  --pulse-space-3: 0.75rem;
+  --pulse-space-4: 1rem;
+  --pulse-space-5: 1.25rem;
+  --pulse-space-6: 1.5rem;
+  --pulse-space-8: 2rem;
+
+  /* Surface Effects & Motion */
+  --pulse-blur-glass: 42px;
+  --pulse-shadow-elevated: 0 18px 46px rgba(0, 0, 0, 0.32);
+  --pulse-motion-fast: 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  --pulse-motion-base: 260ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Layout & Stage Sizing */
+  --pulse-sidebar-width: 356px;
+  --pulse-art-size: 280px;
+  --pulse-playerbar-height: 48px;
+}
+
+[data-theme='light'] {
+  --pulse-color-bg-canvas: #dce4f2;
+  --pulse-color-bg-halo: #f2f6fc;
+  --pulse-color-panel-solid: #ffffff;
+  --pulse-color-bg-surface: rgba(17, 21, 31, 0.055);
+  --pulse-color-bg-elevated: rgba(17, 21, 31, 0.115);
+  --pulse-color-bg-glass: rgba(246, 248, 252, 0.9);
+  --pulse-color-border-subtle: rgba(17, 24, 39, 0.13);
+  --pulse-color-border-strong: rgba(17, 24, 39, 0.28);
+
+  --pulse-color-text-primary: #11151f;
+  --pulse-color-text-secondary: rgba(17, 21, 31, 0.68);
+  --pulse-color-text-muted: rgba(17, 21, 31, 0.48);
+  --pulse-color-text-inverse: #ffffff;
+
+  --pulse-color-accent: #11151f;
+  --pulse-color-accent-hover: #273043;
+  --pulse-color-accent-soft: rgba(17, 21, 31, 0.1);
+  --pulse-color-signal: #16a34a;
+  --pulse-color-signal-soft: rgba(22, 163, 74, 0.14);
+  --pulse-color-warning: #b45309;
+  --pulse-color-danger: #dc2626;
+  --pulse-color-danger-soft: rgba(220, 38, 38, 0.12);
+
+  --pulse-color-slider-track: rgba(17, 21, 31, 0.16);
+  --pulse-color-slider-thumb: var(--pulse-color-accent);
+
+  --pulse-color-blob-1: rgba(120, 132, 255, 0.38);
+  --pulse-color-blob-2: rgba(255, 130, 162, 0.34);
+
+  --pulse-glass-fill-start: rgba(255, 255, 255, 0.68);
+  --pulse-glass-fill-end: rgba(255, 255, 255, 0.34);
+  --pulse-glass-edge-start: rgba(255, 255, 255, 0.92);
+  --pulse-glass-edge-mid: rgba(255, 255, 255, 0.38);
+  --pulse-glass-edge-end: rgba(255, 255, 255, 0.74);
+
+  --pulse-shadow-elevated: 0 14px 36px rgba(17, 21, 31, 0.1);
+}
+
+/* Typography Presets */
+[data-font='mono'] {
+  --pulse-font-display: 'JetBrains Mono', 'Cascadia Code', 'Consolas', ui-monospace, monospace;
+  --pulse-font-sans: 'JetBrains Mono', 'Cascadia Code', 'Consolas', ui-monospace, monospace;
+}
+
+[data-font='serif'] {
+  --pulse-font-display: 'Georgia', 'Palatino Linotype', 'Book Antiqua', 'Times New Roman', serif;
+  --pulse-font-sans: 'Georgia', 'Cambria', 'Times New Roman', serif;
+}
+
+[data-font='geometric'] {
+  --pulse-font-display: 'Trebuchet MS', 'Avenir Next', 'Century Gothic', 'Segoe UI', sans-serif;
+  --pulse-font-sans: 'Trebuchet MS', 'Avenir Next', 'Segoe UI', sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --pulse-motion-fast: 0ms linear;
+    --pulse-motion-base: 0ms linear;
+  }
+}
+
+[data-reduced-motion='true'] {
+  --pulse-motion-fast: 0ms linear;
+  --pulse-motion-base: 0ms linear;
+}

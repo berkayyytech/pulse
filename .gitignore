@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-ssr/
+packages/*/dist/
+*.tsbuildinfo
+*.local
+
+# Tauri / Rust build artifacts
+src-tauri/target/
+src-tauri/WixTools/
+
+# Testing & Playwright
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# Environment & local secrets (NEVER commit Client IDs or tokens)
+.env
+.env.*
+!.env.example
+
+# Editor & OS files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.log

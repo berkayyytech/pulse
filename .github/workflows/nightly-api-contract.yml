@@ -1,0 +1,66 @@
+name: Nightly Spotify API Contract & Smoke Check
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  contract-and-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run Recorded 2026 Fixture Contract Suite
+        run: npm run test:contracts
+      - name: Run Optional Live Dev Mode Smoke Test
+        env:
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
+        run: npm run smoke:live
+      - name: Open or Update Issue on API Contract Drift
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'Automated Alert: Spotify 2026 Web API Contract Regression';
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'spotify-api-drift',
+            });
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              'The nightly Spotify API contract or live smoke job detected a schema or status change.',
+              '',
+              `- Workflow Run: ${runUrl}`,
+              `- Commit: \`${context.sha}\``,
+              '',
+              'Inspect `src/api/schemas/*` and `docs/ARCHITECTURE.md` to update defensive Zod schemas.',
+            ].join('\n');
+
+            if (existing.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['spotify-api-drift'],
+              });
+            }
