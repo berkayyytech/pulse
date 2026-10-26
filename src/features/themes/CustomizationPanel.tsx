@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { RotateCcw, Save } from 'lucide-react';
+import { scheduleDesktopSettingsSave } from '@/platform/desktopSettingsSync';
 import { pulseDb } from '@/storage/db';
 import { useAchievementStore } from '@/stores/achievementStore';
 import {
@@ -146,6 +147,7 @@ export function CustomizationPanel({ onSavedCustomTheme }: CustomizationPanelPro
       ...themePack,
       updatedAt: Date.now(),
     });
+    scheduleDesktopSettingsSave();
     useAchievementStore.getState().incrementMetric('customPresetsSaved', 1);
     setActivePresetId(themePack.id);
     setPresetNameInput('');

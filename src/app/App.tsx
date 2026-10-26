@@ -23,6 +23,10 @@ import {
 } from '@/features/player/webPlaybackSdk';
 import { QueueDrawer } from '@/features/queue/QueueDrawer';
 import { t } from '@/i18n';
+import {
+  flushDesktopSettingsToDisk,
+  startDesktopSettingsSync,
+} from '@/platform/desktopSettingsSync';
 import { probeEmeSupport, type EmeSupportStatus } from '@/platform/emeProbe';
 import { openExternalUrl, openPulsePopupWindow } from '@/platform/openExternal';
 import { getWindowMode, isTauriRuntime } from '@/platform/runtime';
@@ -66,8 +70,9 @@ export function App() {
   const activeEasterEgg = useAchievementStore((s) => s.activeEasterEgg);
   const unlockedCount = useAchievementStore((s) => Object.keys(s.unlockedAt).length);
 
-  // 0. Boot session tracking, 1-second listening/session clock & theme achievement observer
+  // 0. Boot session tracking, desktop disk persistence, 1-second listening/session clock & theme achievement observer
   useEffect(() => {
+    const stopDesktopSync = startDesktopSettingsSync();
     const ach = useAchievementStore.getState();
     ach.recordAppBoot();
     if (windowMode === 'obs') {
@@ -135,6 +140,7 @@ export function App() {
     document.addEventListener('click', handleExternalAnchorClick);
 
     return () => {
+      stopDesktopSync();
       clearInterval(tick);
       unsubTheme();
       document.removeEventListener('click', handleExternalAnchorClick);
@@ -301,7 +307,11 @@ export function App() {
     if (isTauriRuntime()) {
       const win = getCurrentWindow();
       if (kind === 'close') {
-        void win.close();
+        void flushDesktopSettingsToDisk()
+          .catch(() => undefined)
+          .finally(() => {
+            void win.close();
+          });
       } else if (kind === 'minimize') {
         void win.minimize();
       } else {

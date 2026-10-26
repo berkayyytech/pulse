@@ -6,6 +6,56 @@ import type { RepeatMode } from '@/api/spotifyClient';
 
 export type PlaybackEngineKind = 'sdk' | 'connect-remote';
 
+const PLAYER_PREFS_STORAGE_KEY = 'pulse.player.prefs';
+
+interface PersistedPlayerPrefs {
+  readonly volumePercent: number;
+  readonly shuffle: boolean;
+  readonly repeatMode: RepeatMode;
+}
+
+function loadPlayerPrefs(): PersistedPlayerPrefs {
+  const defaults: PersistedPlayerPrefs = {
+    volumePercent: 80,
+    shuffle: false,
+    repeatMode: 'off',
+  };
+  if (typeof localStorage === 'undefined') {
+    return defaults;
+  }
+  const raw = localStorage.getItem(PLAYER_PREFS_STORAGE_KEY);
+  if (!raw) {
+    return defaults;
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<PersistedPlayerPrefs>;
+    return {
+      volumePercent:
+        typeof parsed.volumePercent === 'number' &&
+        parsed.volumePercent >= 0 &&
+        parsed.volumePercent <= 100
+          ? parsed.volumePercent
+          : defaults.volumePercent,
+      shuffle: typeof parsed.shuffle === 'boolean' ? parsed.shuffle : defaults.shuffle,
+      repeatMode:
+        parsed.repeatMode === 'off' ||
+        parsed.repeatMode === 'context' ||
+        parsed.repeatMode === 'track'
+          ? parsed.repeatMode
+          : defaults.repeatMode,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
+function savePlayerPrefs(prefs: PersistedPlayerPrefs): void {
+  if (typeof localStorage === 'undefined') {
+    return;
+  }
+  localStorage.setItem(PLAYER_PREFS_STORAGE_KEY, JSON.stringify(prefs));
+}
+
 interface PlayerState {
   readonly engine: PlaybackEngineKind;
   readonly sdkReady: boolean;
@@ -35,7 +85,10 @@ interface PlayerState {
   tickPosition: (deltaMs: number) => void;
   setLyricsOpen: (open: boolean) => void;
   setQueueOpen: (open: boolean) => void;
+  reloadFromStorage: () => void;
 }
+
+const initialPrefs = loadPlayerPrefs();
 
 export const usePlayerStore = create<PlayerState>((set) => ({
   engine: 'connect-remote',
@@ -46,9 +99,9 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   currentTrack: DEMO_TRACK_1,
   isPlaying: false,
   positionMs: 32_000,
-  volumePercent: 80,
-  shuffle: false,
-  repeatMode: 'off',
+  volumePercent: initialPrefs.volumePercent,
+  shuffle: initialPrefs.shuffle,
+  repeatMode: initialPrefs.repeatMode,
   lyricsOpen: false,
   queueOpen: false,
   setEngine: (engine) => {
@@ -61,18 +114,37 @@ export const usePlayerStore = create<PlayerState>((set) => ({
     set({ availableDevices });
   },
   setPlaybackSnapshot: (snapshot) => {
-    set((state) => ({
-      currentTrack:
-        snapshot.currentTrack !== undefined ? snapshot.currentTrack : state.currentTrack,
-      isPlaying: snapshot.isPlaying !== undefined ? snapshot.isPlaying : state.isPlaying,
-      positionMs: snapshot.positionMs !== undefined ? snapshot.positionMs : state.positionMs,
-      volumePercent:
-        snapshot.volumePercent !== undefined ? snapshot.volumePercent : state.volumePercent,
-      shuffle: snapshot.shuffle !== undefined ? snapshot.shuffle : state.shuffle,
-      repeatMode: snapshot.repeatMode !== undefined ? snapshot.repeatMode : state.repeatMode,
-      activeDevice:
-        snapshot.activeDevice !== undefined ? snapshot.activeDevice : state.activeDevice,
-    }));
+    set((state) => {
+      const nextVolume =
+        snapshot.volumePercent !== undefined ? snapshot.volumePercent : state.volumePercent;
+      const nextShuffle = snapshot.shuffle !== undefined ? snapshot.shuffle : state.shuffle;
+      const nextRepeat =
+        snapshot.repeatMode !== undefined ? snapshot.repeatMode : state.repeatMode;
+
+      if (
+        nextVolume !== state.volumePercent ||
+        nextShuffle !== state.shuffle ||
+        nextRepeat !== state.repeatMode
+      ) {
+        savePlayerPrefs({
+          volumePercent: nextVolume,
+          shuffle: nextShuffle,
+          repeatMode: nextRepeat,
+        });
+      }
+
+      return {
+        currentTrack:
+          snapshot.currentTrack !== undefined ? snapshot.currentTrack : state.currentTrack,
+        isPlaying: snapshot.isPlaying !== undefined ? snapshot.isPlaying : state.isPlaying,
+        positionMs: snapshot.positionMs !== undefined ? snapshot.positionMs : state.positionMs,
+        volumePercent: nextVolume,
+        shuffle: nextShuffle,
+        repeatMode: nextRepeat,
+        activeDevice:
+          snapshot.activeDevice !== undefined ? snapshot.activeDevice : state.activeDevice,
+      };
+    });
   },
   tickPosition: (deltaMs) => {
     set((state) => {
@@ -88,5 +160,13 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   },
   setQueueOpen: (queueOpen) => {
     set({ queueOpen });
+  },
+  reloadFromStorage: () => {
+    const prefs = loadPlayerPrefs();
+    set({
+      volumePercent: prefs.volumePercent,
+      shuffle: prefs.shuffle,
+      repeatMode: prefs.repeatMode,
+    });
   },
 }));

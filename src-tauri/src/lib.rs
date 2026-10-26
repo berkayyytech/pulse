@@ -1,10 +1,15 @@
 use keyring::{Entry, Error as KeyringError};
 use serde::Serialize;
+use std::fs;
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
+use tauri::Manager;
 use tiny_http::{Header, Response, Server};
 use url::Url;
 
 const KEYRING_SERVICE: &str = "org.pulseplayer.client.vault";
+const SETTINGS_FILE_NAME: &str = "pulse-settings.json";
+const MAX_SETTINGS_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -84,6 +89,64 @@ fn open_external_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+fn resolve_settings_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| format!("Unable to resolve OS app config directory: {e}"))?;
+    Ok(dir.join(SETTINGS_FILE_NAME))
+}
+
+#[tauri::command]
+fn desktop_get_settings_path(app: tauri::AppHandle) -> Result<String, String> {
+    let path = resolve_settings_file_path(&app)?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn desktop_read_settings(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let path = resolve_settings_file_path(&app)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    let contents = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read local settings file {}: {e}", path.display()))?;
+    Ok(Some(contents))
+}
+
+#[tauri::command]
+fn desktop_write_settings(app: tauri::AppHandle, contents: String) -> Result<String, String> {
+    if contents.len() > MAX_SETTINGS_BYTES {
+        return Err("Settings payload exceeds 8 MiB safety limit".to_string());
+    }
+    let path = resolve_settings_file_path(&app)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create settings directory {}: {e}", parent.display()))?;
+    }
+    let tmp_path = path.with_extension("json.tmp");
+    fs::write(&tmp_path, contents.as_bytes())
+        .map_err(|e| format!("Failed to write temporary settings file: {e}"))?;
+    if fs::rename(&tmp_path, &path).is_err() {
+        fs::write(&path, contents.as_bytes())
+            .map_err(|e| format!("Failed to save local settings file {}: {e}", path.display()))?;
+        let _ = fs::remove_file(&tmp_path);
+    }
+    Ok(path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn desktop_open_settings_dir(app: tauri::AppHandle) -> Result<(), String> {
+    let path = resolve_settings_file_path(&app)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create settings directory {}: {e}", parent.display()))?;
+        open::that_detached(parent)
+            .map_err(|e| format!("Failed to open settings folder in Explorer: {e}"))?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 async fn listen_loopback_oauth(
     port: u16,
@@ -140,6 +203,10 @@ pub fn run() {
             vault_get,
             vault_delete,
             open_external_url,
+            desktop_get_settings_path,
+            desktop_read_settings,
+            desktop_write_settings,
+            desktop_open_settings_dir,
             listen_loopback_oauth
         ])
         .run(tauri::generate_context!())

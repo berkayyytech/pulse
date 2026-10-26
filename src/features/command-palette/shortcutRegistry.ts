@@ -58,6 +58,7 @@ interface ShortcutStoreState {
   readonly shortcuts: ShortcutMap;
   remapShortcut: (action: ShortcutActionId, combo: string) => void;
   resetShortcuts: () => void;
+  reloadFromStorage: () => void;
 }
 
 export const useShortcutStore = create<ShortcutStoreState>((set, get) => ({
@@ -79,5 +80,8 @@ export const useShortcutStore = create<ShortcutStoreState>((set, get) => ({
       localStorage.removeItem(STORAGE_KEY);
     }
     set({ shortcuts: DEFAULT_SHORTCUTS });
+  },
+  reloadFromStorage: () => {
+    set({ shortcuts: loadShortcuts() });
   },
 }));

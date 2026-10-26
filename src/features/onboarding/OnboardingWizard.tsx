@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertCircle,
   Check,
@@ -41,6 +41,12 @@ export function OnboardingWizard() {
   const [draftClientId, setDraftClientId] = useState(storedClientId ?? '');
   const [copiedUri, setCopiedUri] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (storedClientId && draftClientId.trim() === '') {
+      setDraftClientId(storedClientId);
+    }
+  }, [draftClientId, storedClientId]);
 
   const redirectCheck = resolveRedirectUri();
   const normalizedDraft = normalizeClientIdInput(draftClientId);
@@ -353,8 +359,12 @@ export function OnboardingWizard() {
               placeholder="e.g. a1b2c3d4e5f60718293a4b5c6d7e8f90"
               value={draftClientId}
               onChange={(e) => {
-                setDraftClientId(e.target.value);
+                const rawVal = e.target.value;
+                setDraftClientId(rawVal);
                 setLocalError(null);
+                if (isValidSpotifyClientId(rawVal)) {
+                  setClientId(normalizeClientIdInput(rawVal));
+                }
               }}
               aria-invalid={draftClientId.length > 0 && !isDraftValid}
               style={{
@@ -398,7 +408,7 @@ export function OnboardingWizard() {
               </span>
             </button>
 
-            {storedClientId && isDraftValid && normalizedDraft !== storedClientId ? (
+            {isDraftValid && normalizedDraft !== storedClientId ? (
               <button
                 type="button"
                 className="pulse-nav-btn"

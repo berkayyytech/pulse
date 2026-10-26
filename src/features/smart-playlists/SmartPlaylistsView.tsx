@@ -3,6 +3,7 @@ import { FolderPlus, Save } from 'lucide-react';
 import { getSpotifyClient } from '@/api/clientInstance';
 import { VirtualizedTrackList } from '@/features/library/VirtualizedTrackList';
 import { getAllListeningHistory } from '@/features/stats/historyService';
+import { scheduleDesktopSettingsSave } from '@/platform/desktopSettingsSync';
 import { pulseDb, type ListeningHistoryItem } from '@/storage/db';
 import { useAchievementStore } from '@/stores/achievementStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -87,6 +88,7 @@ export default function SmartPlaylistsView() {
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
+    scheduleDesktopSettingsSave();
     useAchievementStore.getState().incrementMetric('smartPlaylistsCreated', 1);
     setStatusMessage(`Saved smart rule "${ruleName}" locally in IndexedDB.`);
   };

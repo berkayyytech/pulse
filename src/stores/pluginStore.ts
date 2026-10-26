@@ -15,6 +15,34 @@ export interface InstalledPluginState {
   readonly devServerUrl?: string;
 }
 
+const PLUGINS_STORAGE_KEY = 'pulse.plugins.installed';
+
+function loadPersistedPlugins(): Record<string, InstalledPluginState> {
+  if (typeof localStorage === 'undefined') {
+    return {};
+  }
+  const raw = localStorage.getItem(PLUGINS_STORAGE_KEY);
+  if (!raw) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, InstalledPluginState>;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+function savePersistedPlugins(plugins: Readonly<Record<string, InstalledPluginState>>): void {
+  if (typeof localStorage === 'undefined') {
+    return;
+  }
+  localStorage.setItem(PLUGINS_STORAGE_KEY, JSON.stringify(plugins));
+}
+
 interface PluginStoreState {
   readonly plugins: Readonly<Record<string, InstalledPluginState>>;
   readonly slotOutputs: Readonly<Record<PluginUiSlotName, readonly (PluginSlotPayload & { pluginId: string })[]>>;
@@ -26,28 +54,32 @@ interface PluginStoreState {
   setSlotOutput: (pluginId: string, payload: PluginSlotPayload) => void;
   clearPluginOutputs: (pluginId: string) => void;
   registerPluginCommand: (pluginId: string, command: PluginCommandDescriptor) => void;
+  reloadFromStorage: () => void;
 }
 
 export const usePluginStore = create<PluginStoreState>((set) => ({
-  plugins: {},
+  plugins: loadPersistedPlugins(),
   slotOutputs: {
     'now-playing-badge': [],
     'sidebar-footer': [],
   },
   registeredCommands: [],
   upsertPlugin: (plugin) => {
-    set((state) => ({
-      plugins: {
+    set((state) => {
+      const nextPlugins = {
         ...state.plugins,
         [plugin.manifest.id]: plugin,
-      },
-    }));
+      };
+      savePersistedPlugins(nextPlugins);
+      return { plugins: nextPlugins };
+    });
   },
   removePlugin: (pluginId) => {
     set((state) => {
       const nextPlugins = Object.fromEntries(
         Object.entries(state.plugins).filter(([id]) => id !== pluginId),
       );
+      savePersistedPlugins(nextPlugins);
       return {
         plugins: nextPlugins,
         slotOutputs: {
@@ -68,12 +100,12 @@ export const usePluginStore = create<PluginStoreState>((set) => ({
       if (!existing) {
         return state;
       }
-      return {
-        plugins: {
-          ...state.plugins,
-          [pluginId]: { ...existing, enabled },
-        },
+      const nextPlugins = {
+        ...state.plugins,
+        [pluginId]: { ...existing, enabled },
       };
+      savePersistedPlugins(nextPlugins);
+      return { plugins: nextPlugins };
     });
   },
   updatePluginSetting: (pluginId, key, value) => {
@@ -82,15 +114,15 @@ export const usePluginStore = create<PluginStoreState>((set) => ({
       if (!existing) {
         return state;
       }
-      return {
-        plugins: {
-          ...state.plugins,
-          [pluginId]: {
-            ...existing,
-            settings: { ...existing.settings, [key]: value },
-          },
+      const nextPlugins = {
+        ...state.plugins,
+        [pluginId]: {
+          ...existing,
+          settings: { ...existing.settings, [key]: value },
         },
       };
+      savePersistedPlugins(nextPlugins);
+      return { plugins: nextPlugins };
     });
   },
   setSlotOutput: (pluginId, payload) => {
@@ -127,5 +159,8 @@ export const usePluginStore = create<PluginStoreState>((set) => ({
         registeredCommands: [...filtered, { ...command, pluginId }],
       };
     });
+  },
+  reloadFromStorage: () => {
+    set({ plugins: loadPersistedPlugins() });
   },
 }));

@@ -168,6 +168,7 @@ interface AchievementStoreState {
   recordThemeSelection: (presetId: string, surfaceStyle: string) => void;
   recordVolumeLevel: (volumePercent: number) => void;
   resetProgress: () => void;
+  reloadFromStorage: () => void;
 }
 
 function computeTotalXp(unlockedAt: Readonly<Record<string, number>>): number {
@@ -617,6 +618,24 @@ export const useAchievementStore = create<AchievementStoreState>((set, get) => {
         recentToast: null,
         activeEasterEgg: null,
         totalXp: 0,
+      });
+    },
+
+    reloadFromStorage: () => {
+      const reloaded = loadInitialData();
+      set({
+        metrics: reloaded.metrics,
+        flags: reloaded.flags,
+        unlockedAt: reloaded.unlockedAt,
+        uniqueTrackUris: reloaded.uniqueTrackUris,
+        uniqueArtistKeys: reloaded.uniqueArtistKeys,
+        uniqueQueries: reloaded.uniqueQueries,
+        uniqueThemes: reloaded.uniqueThemes,
+        uniqueDays: reloaded.uniqueDays,
+        surfacesTried: reloaded.surfacesTried,
+        aeroThemesTried: reloaded.aeroThemesTried,
+        toastsEnabled: reloaded.toastsEnabled,
+        totalXp: computeTotalXp(reloaded.unlockedAt),
       });
     },
   };

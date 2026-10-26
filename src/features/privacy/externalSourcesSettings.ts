@@ -1,3 +1,4 @@
+import { scheduleDesktopSettingsSave } from '@/platform/desktopSettingsSync';
 import { getTokenVault } from '@/platform/tokenVault';
 
 export interface ExternalSourcesConfig {
@@ -43,6 +44,7 @@ export function setExternalSourcesConfig(next: ExternalSourcesConfig): void {
     return;
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  scheduleDesktopSettingsSave();
 }
 
 export async function saveLastFmApiKey(apiKey: string): Promise<void> {

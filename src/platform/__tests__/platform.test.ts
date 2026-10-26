@@ -1,8 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
+import {
+  flushDesktopSettingsToDisk,
+  hydrateDesktopSettingsFromDisk,
+  resetDesktopSyncStateForTesting,
+} from '@/platform/desktopSettingsSync';
 import { probeEmeSupport } from '@/platform/emeProbe';
 import { openExternalUrl } from '@/platform/openExternal';
 import { resolveRedirectUri } from '@/platform/redirectUri';
 import { WebCryptoIndexedDbVault } from '@/platform/tokenVault';
+import { useAuthStore } from '@/stores/authStore';
+import { usePlayerStore } from '@/stores/playerStore';
+import { useThemeStore } from '@/stores/themeStore';
 
 describe('Platform Security, Redirect URI Rules & EME Probing', () => {
   it('encrypts secrets in WebCryptoIndexedDbVault and never stores plaintext bytes', async () => {
@@ -101,6 +109,66 @@ describe('Platform Security, Redirect URI Rules & EME Probing', () => {
       );
     } finally {
       delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+    }
+  });
+
+  it('persists and re-hydrates all settings locally on disk in the .exe Tauri runtime', async () => {
+    localStorage.clear();
+    resetDesktopSyncStateForTesting();
+
+    let fakeDiskFile: string | null = null;
+    const diskPath = 'C:\\Users\\berka\\AppData\\Roaming\\org.pulseplayer.client\\pulse-settings.json';
+
+    const invokeMock = vi.fn((cmd: string, args?: { contents?: string }) => {
+      if (cmd === 'desktop_read_settings') {
+        return Promise.resolve(fakeDiskFile);
+      }
+      if (cmd === 'desktop_get_settings_path') {
+        return Promise.resolve(diskPath);
+      }
+      if (cmd === 'desktop_write_settings') {
+        fakeDiskFile = args?.contents ?? null;
+        return Promise.resolve(diskPath);
+      }
+      return Promise.resolve(null);
+    });
+
+    (window as unknown as { __TAURI_INTERNALS__?: { invoke: typeof invokeMock } }).__TAURI_INTERNALS__ = {
+      invoke: invokeMock,
+    };
+
+    try {
+      await hydrateDesktopSettingsFromDisk();
+
+      // Change theme, surface, clientId, and player volume
+      useThemeStore.getState().setSurfaceStyle('aero');
+      useThemeStore.getState().setShellLayout('bottom-player');
+      useAuthStore.getState().setClientId('a1b2c3d4e5f60718293a4b5c6d7e8f90');
+      usePlayerStore.getState().setPlaybackSnapshot({ volumePercent: 42, shuffle: true });
+
+      const writtenPath = await flushDesktopSettingsToDisk();
+      expect(writtenPath).toBe(diskPath);
+      expect(fakeDiskFile).toContain('a1b2c3d4e5f60718293a4b5c6d7e8f90');
+      expect(fakeDiskFile).toContain('bottom-player');
+
+      // Simulate fresh WebView2 folder after .exe update / restart (localStorage wiped)
+      localStorage.clear();
+      useThemeStore.getState().resetAllCustomization();
+      useAuthStore.getState().setClientId(null);
+      usePlayerStore.getState().setPlaybackSnapshot({ volumePercent: 80, shuffle: false });
+      resetDesktopSyncStateForTesting();
+
+      // Hydrate from the native pulse-settings.json file on disk
+      await hydrateDesktopSettingsFromDisk();
+
+      expect(useThemeStore.getState().surfaceStyle).toBe('aero');
+      expect(useThemeStore.getState().shellLayout).toBe('bottom-player');
+      expect(useAuthStore.getState().clientId).toBe('a1b2c3d4e5f60718293a4b5c6d7e8f90');
+      expect(usePlayerStore.getState().volumePercent).toBe(42);
+      expect(usePlayerStore.getState().shuffle).toBe(true);
+    } finally {
+      delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+      resetDesktopSyncStateForTesting();
     }
   });
 });

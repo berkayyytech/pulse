@@ -2,7 +2,9 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   Activity,
   Blocks,
+  CheckCircle2,
   Command,
+  FolderOpen,
   KeyRound,
   Library,
   ListFilter,
@@ -20,6 +22,15 @@ import { CustomizationPanel } from '@/features/themes/CustomizationPanel';
 import { ThemePresetGrid } from '@/features/themes/ThemePresetGrid';
 import type { ThemePack } from '@/features/themes/themeEngine';
 import { t, type TranslationKey } from '@/i18n';
+import {
+  flushDesktopSettingsToDisk,
+  getCachedDesktopSettingsPath,
+  getDesktopSettingsPath,
+  onDesktopSettingsSaved,
+  openDesktopSettingsFolder,
+  scheduleDesktopSettingsSave,
+} from '@/platform/desktopSettingsSync';
+import { isTauriRuntime } from '@/platform/runtime';
 import { pulseDb } from '@/storage/db';
 import { useAchievementStore } from '@/stores/achievementStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -66,7 +77,12 @@ export function GlassSettingsSheet() {
   const setColorMode = useThemeStore((s) => s.setColorMode);
 
   const [customThemes, setCustomThemes] = useState<ThemePack[]>([]);
+  const [desktopSettingsPath, setDesktopSettingsPath] = useState<string | null>(() =>
+    getCachedDesktopSettingsPath(),
+  );
+  const [manualSaveConfirm, setManualSaveConfirm] = useState(false);
   const settingsHeadingTapRef = useRef<number[]>([]);
+  const inDesktopExe = isTauriRuntime();
 
   useEffect(() => {
     if (!open) {
@@ -79,10 +95,25 @@ export function GlassSettingsSheet() {
         setCustomThemes(rows);
       }
     });
+    if (inDesktopExe) {
+      void getDesktopSettingsPath()
+        .then((p) => {
+          if (active && p) {
+            setDesktopSettingsPath(p);
+          }
+        })
+        .catch(() => undefined);
+    }
+    const unsubSaved = onDesktopSettingsSaved(({ path }) => {
+      if (active) {
+        setDesktopSettingsPath(path);
+      }
+    });
     return () => {
       active = false;
+      unsubSaved();
     };
-  }, [open]);
+  }, [inDesktopExe, open]);
 
   if (!open) {
     return null;
@@ -104,6 +135,7 @@ export function GlassSettingsSheet() {
 
   const handleDeleteCustom = (id: string) => {
     void pulseDb.customThemes.delete(id).then(async () => {
+      scheduleDesktopSettingsSave();
       setCustomThemes(await pulseDb.customThemes.toArray());
     });
   };
@@ -187,6 +219,70 @@ export function GlassSettingsSheet() {
               </button>
             </div>
           </div>
+
+          {/* Local Disk Persistence Status Bar on Desktop .exe */}
+          {inDesktopExe ? (
+            <div
+              className="pulse-card"
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 14px',
+                marginBottom: '14px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                <CheckCircle2 size={16} color="var(--pulse-color-signal)" aria-hidden="true" />
+                <div style={{ fontSize: '0.82rem', minWidth: 0 }}>
+                  <strong>All settings auto-save locally on disk</strong>
+                  {desktopSettingsPath ? (
+                    <span
+                      style={{
+                        display: 'block',
+                        fontFamily: 'var(--pulse-font-mono)',
+                        fontSize: '0.74rem',
+                        color: 'var(--pulse-color-text-secondary)',
+                        wordBreak: 'break-all',
+                      }}
+                    >
+                      {desktopSettingsPath}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  type="button"
+                  className="pulse-mono-pill"
+                  style={{ cursor: 'pointer', padding: '5px 10px' }}
+                  onClick={() => {
+                    void flushDesktopSettingsToDisk().then(() => {
+                      setManualSaveConfirm(true);
+                      setTimeout(() => {
+                        setManualSaveConfirm(false);
+                      }, 1800);
+                    });
+                  }}
+                >
+                  <span>{manualSaveConfirm ? 'Saved!' : 'Save Now'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="pulse-mono-pill"
+                  style={{ cursor: 'pointer', padding: '5px 10px' }}
+                  onClick={() => {
+                    void openDesktopSettingsFolder();
+                  }}
+                >
+                  <FolderOpen size={12} aria-hidden="true" />
+                  <span>Open Folder</span>
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {/* Section Pill Tabs */}
           <nav

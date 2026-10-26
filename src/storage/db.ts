@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
+import type { ThemePack } from '@/features/themes/themeEngine';
 
 export interface ApiCacheEntry {
   cacheKey: string;
@@ -28,12 +29,7 @@ export interface SmartPlaylistRecord {
   updatedAt: number;
 }
 
-export interface ThemePackRecord {
-  id: string;
-  name: string;
-  author: string;
-  mode: 'dark' | 'light';
-  tokens: Record<string, string>;
+export interface ThemePackRecord extends ThemePack {
   updatedAt: number;
 }
 

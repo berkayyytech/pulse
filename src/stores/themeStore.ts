@@ -62,6 +62,7 @@ interface ThemeState {
   updateSingleToken: (tokenName: string, value: string) => void;
   applyThemePreset: (preset: ThemePack) => void;
   resetAllCustomization: () => void;
+  reloadFromStorage: () => void;
 }
 
 export function applyColorModeToDocument(mode: ColorMode): void {
@@ -413,5 +414,11 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
       localStorage.removeItem(THEME_STORAGE_KEY);
     }
     syncDocumentThemeAttributes(DEFAULT_SNAPSHOT);
+  },
+  reloadFromStorage: () => {
+    const previousKeys = Object.keys(get().customTokens);
+    clearCustomTokensFromDocument(previousKeys);
+    const reloaded = loadInitialThemeSnapshot();
+    set({ ...reloaded });
   },
 }));

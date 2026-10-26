@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Download, Upload } from 'lucide-react';
+import { scheduleDesktopSettingsSave } from '@/platform/desktopSettingsSync';
 import { pulseDb } from '@/storage/db';
 import { useAchievementStore } from '@/stores/achievementStore';
 import { useThemeStore } from '@/stores/themeStore';
@@ -63,6 +64,7 @@ export default function ThemeStudioView() {
         ...parsed,
         updatedAt: Date.now(),
       });
+      scheduleDesktopSettingsSave();
       setSavedCustomThemes(await pulseDb.customThemes.toArray());
       applyThemePreset(parsed);
       useAchievementStore.getState().setFlag('themeJsonImported');

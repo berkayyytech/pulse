@@ -1,4 +1,5 @@
 import type { Track } from '@/api/schemas/catalog';
+import { scheduleDesktopSettingsSave } from '@/platform/desktopSettingsSync';
 import { pulseDb, type ListeningHistoryItem } from '@/storage/db';
 
 const HISTORY_OPT_IN_KEY = 'pulse.privacy.listeningHistoryOptIn';
@@ -15,6 +16,7 @@ export function setListeningHistoryEnabled(enabled: boolean): void {
     return;
   }
   localStorage.setItem(HISTORY_OPT_IN_KEY, String(enabled));
+  scheduleDesktopSettingsSave();
 }
 
 export async function recordListenIfEnabled(

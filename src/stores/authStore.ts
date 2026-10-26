@@ -35,6 +35,7 @@ interface AuthState {
   setDemoSession: (user: UserProfile) => void;
   setSignedOut: (diagnostic?: HumanAuthDiagnostic | null) => void;
   setDiagnostic: (diagnostic: HumanAuthDiagnostic | null) => void;
+  reloadFromStorage: () => void;
 }
 
 const CLIENT_ID_HEX_REGEX = /^[a-f0-9]{32}$/i;
@@ -99,6 +100,18 @@ export const useAuthStore = create<AuthState>((set) => {
     },
     setDiagnostic: (diagnostic) => {
       set({ diagnostic });
+    },
+    reloadFromStorage: () => {
+      const reloadedClientId = readStoredClientId();
+      set((state) => ({
+        clientId: reloadedClientId,
+        status:
+          state.status === 'authenticated' || state.status === 'demo'
+            ? state.status
+            : reloadedClientId
+              ? 'signed-out'
+              : 'unconfigured',
+      }));
     },
   };
 });
