@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { probeEmeSupport } from '@/platform/emeProbe';
+import { openExternalUrl } from '@/platform/openExternal';
 import { resolveRedirectUri } from '@/platform/redirectUri';
 import { WebCryptoIndexedDbVault } from '@/platform/tokenVault';
 
@@ -73,5 +74,33 @@ describe('Platform Security, Redirect URI Rules & EME Probing', () => {
     expect(supportedEme.supported).toBe(true);
     expect(supportedEme.keySystem).toBe('com.widevine.alpha');
     expect(supportedEme.fallbackMode).toBe('sdk');
+  });
+
+  it('routes external HTTPS links via Tauri IPC in .exe runtime and blocks non-HTTPS schemes', async () => {
+    await expect(openExternalUrl('javascript:alert(1)')).rejects.toThrow(/Only HTTPS/);
+
+    const winOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    await openExternalUrl('https://developer.spotify.com/dashboard');
+    expect(winOpenSpy).toHaveBeenCalledWith(
+      'https://developer.spotify.com/dashboard',
+      '_blank',
+      'noopener,noreferrer',
+    );
+    winOpenSpy.mockRestore();
+
+    const invokeMock = vi.fn().mockResolvedValue(null);
+    (window as unknown as { __TAURI_INTERNALS__?: { invoke: typeof invokeMock } }).__TAURI_INTERNALS__ = {
+      invoke: invokeMock,
+    };
+    try {
+      await openExternalUrl('https://developer.spotify.com/dashboard');
+      expect(invokeMock).toHaveBeenCalledWith(
+        'open_external_url',
+        { url: 'https://developer.spotify.com/dashboard' },
+        undefined,
+      );
+    } finally {
+      delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+    }
   });
 });

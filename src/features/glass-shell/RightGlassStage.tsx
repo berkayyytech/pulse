@@ -18,6 +18,7 @@ import { bindMediaSessionHandlers, syncMediaSessionMetadata } from '@/features/p
 import { playerController } from '@/features/player/playerController';
 import { PluginSlotView } from '@/features/plugins/PluginSlotView';
 import { applyDynamicAlbumAccentIfEnabled } from '@/features/themes/extractDominantAccent';
+import { openPulsePopupWindow } from '@/platform/openExternal';
 import { useAchievementStore } from '@/stores/achievementStore';
 import { useAuthStore } from '@/stores/authStore';
 import { usePlayerStore } from '@/stores/playerStore';
@@ -204,7 +205,7 @@ export function RightGlassStage() {
           style={{ width: '30px', height: '30px' }}
           onClick={() => {
             useAchievementStore.getState().setFlag('openedMiniPlayer');
-            window.open('/?mode=mini', 'pulse-mini', 'width=440,height=160');
+            void openPulsePopupWindow('mini');
           }}
         >
           <PictureInPicture2 size={13} />

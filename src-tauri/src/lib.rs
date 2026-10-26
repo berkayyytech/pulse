@@ -1,6 +1,5 @@
 use keyring::{Entry, Error as KeyringError};
 use serde::Serialize;
-use std::process::Command;
 use std::time::{Duration, Instant};
 use tiny_http::{Header, Response, Server};
 use url::Url;
@@ -65,33 +64,23 @@ fn open_external_url(url: String) -> Result<(), String> {
     let host = parsed.host_str().unwrap_or_default();
     let allowed = matches!(
         host,
-        "accounts.spotify.com" | "developer.spotify.com" | "open.spotify.com"
+        "accounts.spotify.com"
+            | "developer.spotify.com"
+            | "open.spotify.com"
+            | "www.spotify.com"
+            | "spotify.com"
+            | "lrclib.net"
+            | "musicbrainz.org"
+            | "coverartarchive.org"
+            | "www.last.fm"
+            | "github.com"
     );
     if !allowed {
         return Err(format!("Blocked external host: {host}"));
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        Command::new("rundll32")
-            .args(["url.dll,FileProtocolHandler", parsed.as_str()])
-            .spawn()
-            .map_err(|e| format!("Failed to launch default browser: {e}"))?;
-    }
-    #[cfg(target_os = "macos")]
-    {
-        Command::new("open")
-            .arg(parsed.as_str())
-            .spawn()
-            .map_err(|e| format!("Failed to launch browser: {e}"))?;
-    }
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        Command::new("xdg-open")
-            .arg(parsed.as_str())
-            .spawn()
-            .map_err(|e| format!("Failed to launch browser: {e}"))?;
-    }
+    open::that_detached(parsed.as_str())
+        .map_err(|e| format!("Failed to launch default system browser: {e}"))?;
     Ok(())
 }
 

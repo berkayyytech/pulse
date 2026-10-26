@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { PluginSlotView } from '@/features/plugins/PluginSlotView';
 import { applyDynamicAlbumAccentIfEnabled } from '@/features/themes/extractDominantAccent';
+import { openExternalUrl, openPulsePopupWindow } from '@/platform/openExternal';
+import { isTauriRuntime } from '@/platform/runtime';
 import { usePlayerStore } from '@/stores/playerStore';
 import { DevicePicker } from './DevicePicker';
 import { formatDurationMs } from './formatTime';
@@ -82,12 +84,7 @@ export function NowPlayingBar() {
   const spotifyUrl = currentTrack?.external_urls.spotify;
 
   const openWindowMode = (mode: 'mini' | 'obs') => {
-    const url = `${window.location.origin}/?mode=${mode}`;
-    window.open(
-      url,
-      `pulse_${mode}`,
-      mode === 'mini' ? 'width=420,height=160' : 'width=520,height=140',
-    );
+    void openPulsePopupWindow(mode);
   };
 
   return (
@@ -150,6 +147,12 @@ export function NowPlayingBar() {
                 href={spotifyUrl}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(e) => {
+                  if (isTauriRuntime()) {
+                    e.preventDefault();
+                    void openExternalUrl(spotifyUrl).catch(() => undefined);
+                  }
+                }}
                 style={{
                   fontSize: '0.72rem',
                   display: 'inline-flex',

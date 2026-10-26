@@ -24,6 +24,7 @@ import {
 import { QueueDrawer } from '@/features/queue/QueueDrawer';
 import { t } from '@/i18n';
 import { probeEmeSupport, type EmeSupportStatus } from '@/platform/emeProbe';
+import { openExternalUrl, openPulsePopupWindow } from '@/platform/openExternal';
 import { getWindowMode, isTauriRuntime } from '@/platform/runtime';
 import { useAuthStore } from '@/stores/authStore';
 import { useAchievementStore } from '@/stores/achievementStore';
@@ -113,9 +114,30 @@ export function App() {
       }
     });
 
+    const handleExternalAnchorClick = (event: MouseEvent) => {
+      if (!isTauriRuntime() || event.defaultPrevented) {
+        return;
+      }
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      const anchor = target.closest('a[href]');
+      if (!(anchor instanceof HTMLAnchorElement)) {
+        return;
+      }
+      const rawHref = anchor.getAttribute('href') ?? '';
+      if (rawHref.startsWith('https://')) {
+        event.preventDefault();
+        void openExternalUrl(rawHref).catch(() => undefined);
+      }
+    };
+    document.addEventListener('click', handleExternalAnchorClick);
+
     return () => {
       clearInterval(tick);
       unsubTheme();
+      document.removeEventListener('click', handleExternalAnchorClick);
     };
   }, [windowMode]);
 
@@ -289,7 +311,7 @@ export function App() {
     }
 
     if (kind === 'minimize') {
-      window.open('/?mode=mini', 'pulse-mini', 'width=440,height=160');
+      void openPulsePopupWindow('mini');
     } else if (kind === 'maximize') {
       if (!document.fullscreenElement) {
         void document.documentElement.requestFullscreen().catch(() => undefined);

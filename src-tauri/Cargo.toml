@@ -21,3 +21,4 @@ serde_json = "1.0"
 keyring = { version = "3.6", features = ["apple-native", "windows-native", "sync-secret-service"] }
 tiny_http = "0.12"
 url = "2.5"
+open = "5"

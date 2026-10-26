@@ -16,6 +16,7 @@ import { DEMO_USER } from '@/api/demoCatalog';
 import { DEMO_TRACKS } from '@/api/demoCatalog';
 import { getValidAccessToken, signOutSpotify, startPkceLogin } from '@/features/auth/authService';
 import { playerController } from '@/features/player/playerController';
+import { openExternalUrl } from '@/platform/openExternal';
 import { isTauriRuntime } from '@/platform/runtime';
 import { resolveRedirectUri } from '@/platform/redirectUri';
 import { useAchievementStore } from '@/stores/achievementStore';
@@ -232,7 +233,19 @@ export function OnboardingWizard() {
               href="https://developer.spotify.com/dashboard"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+              onClick={(e) => {
+                if (isTauriRuntime()) {
+                  e.preventDefault();
+                  void openExternalUrl('https://developer.spotify.com/dashboard').catch((err: unknown) => {
+                    setLocalError(
+                      err instanceof Error
+                        ? err.message
+                        : 'Open https://developer.spotify.com/dashboard in your browser.',
+                    );
+                  });
+                }
+              }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
             >
               <span>Open Dashboard</span>
               <ExternalLink size={14} aria-hidden="true" />
