@@ -45,7 +45,7 @@ export function LeftGlassBrowser() {
   const [searchTracks, setSearchTracks] = useState<Track[]>(() => [...DEMO_TRACKS]);
   const [searching, setSearching] = useState(false);
 
-  const [libSubFilter, setLibSubFilter] = useState<LibrarySubFilter>('tracks');
+  const [libSubFilter, setLibSubFilter] = useState<LibrarySubFilter>('local');
   const [savedTracks, setSavedTracks] = useState<Track[]>(() => [...DEMO_TRACKS]);
   const [localTracks, setLocalTracks] = useState<Track[]>(() => [...CURATED_OPEN_TRACKS]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -593,7 +593,7 @@ export function LeftGlassBrowser() {
               textDecoration: 'underline',
             }}
           >
-            Connect Spotify
+            Connect Spotify (Optional)
           </button>
         ) : null}
 

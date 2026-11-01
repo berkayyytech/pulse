@@ -55,13 +55,14 @@ export function isValidSpotifyClientId(value: string): boolean {
 
 function readStoredAccountTier(): AccountTier {
   if (typeof localStorage === 'undefined') {
-    return 'spotify-premium';
+    return 'local-only';
   }
   const raw = localStorage.getItem(ACCOUNT_TIER_STORAGE_KEY);
   if (raw === 'spotify-premium' || raw === 'spotify-free' || raw === 'local-only') {
     return raw;
   }
-  return 'spotify-premium';
+  const hasClientId = Boolean(localStorage.getItem(CLIENT_ID_STORAGE_KEY));
+  return hasClientId ? 'spotify-premium' : 'local-only';
 }
 
 function readStoredClientId(): string | null {

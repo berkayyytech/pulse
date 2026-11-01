@@ -436,6 +436,48 @@ export function OnboardingWizard() {
         </article>
       ) : null}
 
+      {/* Warning about Spotify's Developer Portal Paywall for Free Accounts */}
+      <article
+        className="pulse-card"
+        style={{
+          borderColor: 'var(--pulse-color-accent)',
+          background: 'rgba(235, 115, 78, 0.08)',
+          marginBottom: 'var(--pulse-space-4)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 700, color: 'var(--pulse-color-accent)' }}>
+          <AlertCircle size={20} />
+          <span style={{ fontSize: '1.05rem' }}>Do You Have a Free Spotify Account? Read This First</span>
+        </div>
+        <p style={{ margin: '0.6rem 0 0.35rem', lineHeight: 1.5 }}>
+          Spotify now restricts <code>developer.spotify.com</code> so that <strong>only Spotify Premium accounts can create new developer apps</strong>. If you try to create an app with a free account, Spotify shows the message: <em>&quot;Upgrade to Spotify Premium to access the Web API&quot;</em> and refuses to save.
+        </p>
+        <p style={{ margin: '0 0 0.75rem', color: 'var(--pulse-color-text-secondary)', fontSize: '0.88rem' }}>
+          <strong>You do NOT need to create a Spotify app to use Pulse!</strong> Pulse includes a 100% free standalone Local &amp; Royalty-Free audio player with drag &amp; drop and built-in music.
+        </p>
+        <button
+          type="button"
+          className="pulse-nav-btn"
+          style={{
+            width: 'auto',
+            background: 'var(--pulse-color-accent)',
+            color: 'var(--pulse-color-text-inverse)',
+            border: 'none',
+            fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.55rem 1rem',
+          }}
+          onClick={() => {
+            handleSelectTier('local-only');
+          }}
+        >
+          <Disc3 size={16} />
+          <span>Use Free Standalone Player (No Spotify Required)</span>
+        </button>
+      </article>
+
       <div className="pulse-card-grid" style={{ gridTemplateColumns: '1fr' }}>
         {/* Step 1 */}
         <article className="pulse-card">

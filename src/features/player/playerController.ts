@@ -21,7 +21,9 @@ export function isLocalOrCuratedTrack(track: Track | null): boolean {
     track.is_local ||
     track.uri.startsWith('pulse:local:') ||
     track.uri.startsWith('pulse:curated:') ||
-    track.uri.startsWith('pulse:demo:')
+    track.uri.startsWith('pulse:demo:') ||
+    track.uri.startsWith('spotify:track:trk_') ||
+    Boolean(track.id?.startsWith('trk_'))
   );
 }
 

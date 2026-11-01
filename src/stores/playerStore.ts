@@ -3,6 +3,7 @@ import { DEMO_TRACK_1 } from '@/api/demoCatalog';
 import type { Track } from '@/api/schemas/catalog';
 import type { ConnectDevice } from '@/api/schemas/player';
 import type { RepeatMode } from '@/api/spotifyClient';
+import { CURATED_OPEN_TRACKS } from '@/features/local-audio/localAudioService';
 
 export type PlaybackEngineKind = 'sdk' | 'connect-remote' | 'html-audio';
 
@@ -91,14 +92,14 @@ interface PlayerState {
 const initialPrefs = loadPlayerPrefs();
 
 export const usePlayerStore = create<PlayerState>((set) => ({
-  engine: 'connect-remote',
+  engine: 'html-audio',
   sdkReady: false,
   sdkDeviceId: null,
   activeDevice: null,
   availableDevices: [],
-  currentTrack: DEMO_TRACK_1,
+  currentTrack: CURATED_OPEN_TRACKS[0] ?? DEMO_TRACK_1,
   isPlaying: false,
-  positionMs: 32_000,
+  positionMs: 0,
   volumePercent: initialPrefs.volumePercent,
   shuffle: initialPrefs.shuffle,
   repeatMode: initialPrefs.repeatMode,

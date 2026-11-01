@@ -34,7 +34,7 @@ interface UiState {
 
 export const useUiStore = create<UiState>((set) => ({
   activeRoute: 'setup',
-  leftPaneTab: 'search',
+  leftPaneTab: 'library',
   settingsSheetOpen: false,
   importModalOpen: false,
   commandPaletteOpen: false,
