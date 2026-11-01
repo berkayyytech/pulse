@@ -22,3 +22,5 @@ keyring = { version = "3.6", features = ["apple-native", "windows-native", "sync
 tiny_http = "0.12"
 url = "2.5"
 open = "5"
+ureq = "2.12"
+sha2 = "0.10"

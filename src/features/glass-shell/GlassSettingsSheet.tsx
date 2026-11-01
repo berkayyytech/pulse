@@ -21,6 +21,7 @@ import { PluginSlotView } from '@/features/plugins/PluginSlotView';
 import { CustomizationPanel } from '@/features/themes/CustomizationPanel';
 import { ThemePresetGrid } from '@/features/themes/ThemePresetGrid';
 import type { ThemePack } from '@/features/themes/themeEngine';
+import { UpdateSettingsCard } from '@/features/updater/UpdateSettingsCard';
 import { t, type TranslationKey } from '@/i18n';
 import {
   flushDesktopSettingsToDisk,
@@ -72,6 +73,7 @@ export function GlassSettingsSheet() {
   const authStatus = useAuthStore((s) => s.status);
   const user = useAuthStore((s) => s.user);
   const clientId = useAuthStore((s) => s.clientId);
+  const accountTier = useAuthStore((s) => s.accountTier);
 
   const colorMode = useThemeStore((s) => s.colorMode);
   const setColorMode = useThemeStore((s) => s.setColorMode);
@@ -385,6 +387,19 @@ export function GlassSettingsSheet() {
                         ? `Authenticated via PKCE S256 • Client ID ${clientId?.slice(0, 8) ?? ''}…`
                         : 'Supply your own Spotify Developer Client ID below — zero shared quotas.'}
                     </div>
+                    <div style={{ marginTop: '4px' }}>
+                      <span
+                        className="pulse-mono-pill"
+                        data-tone={accountTier === 'local-only' ? 'accent' : 'signal'}
+                        style={{ fontSize: '0.74rem' }}
+                      >
+                        {accountTier === 'local-only'
+                          ? 'Local & Open Audio Mode'
+                          : accountTier === 'spotify-free'
+                            ? 'Spotify Free Companion'
+                            : 'Spotify Premium'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -400,6 +415,8 @@ export function GlassSettingsSheet() {
                   </button>
                 ) : null}
               </div>
+
+              <UpdateSettingsCard />
 
               <div
                 style={{

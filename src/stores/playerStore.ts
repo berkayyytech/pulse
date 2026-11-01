@@ -4,7 +4,7 @@ import type { Track } from '@/api/schemas/catalog';
 import type { ConnectDevice } from '@/api/schemas/player';
 import type { RepeatMode } from '@/api/spotifyClient';
 
-export type PlaybackEngineKind = 'sdk' | 'connect-remote';
+export type PlaybackEngineKind = 'sdk' | 'connect-remote' | 'html-audio';
 
 const PLAYER_PREFS_STORAGE_KEY = 'pulse.player.prefs';
 

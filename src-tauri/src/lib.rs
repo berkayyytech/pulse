@@ -1,7 +1,10 @@
 use keyring::{Entry, Error as KeyringError};
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::fs;
+use std::io::Read;
 use std::path::PathBuf;
+use std::process::Command;
 use std::time::{Duration, Instant};
 use tauri::Manager;
 use tiny_http::{Header, Response, Server};
@@ -10,6 +13,7 @@ use url::Url;
 const KEYRING_SERVICE: &str = "org.pulseplayer.client.vault";
 const SETTINGS_FILE_NAME: &str = "pulse-settings.json";
 const MAX_SETTINGS_BYTES: usize = 8 * 1024 * 1024;
+const MAX_INSTALLER_BYTES: u64 = 150 * 1024 * 1024;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -147,6 +151,134 @@ fn desktop_open_settings_dir(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+fn is_allowed_update_host(host: &str) -> bool {
+    matches!(
+        host,
+        "github.com"
+            | "objects.githubusercontent.com"
+            | "release-assets.githubusercontent.com"
+    )
+}
+
+fn sanitize_installer_filename(raw: &str) -> Result<String, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() || trimmed.len() > 120 {
+        return Err("Invalid update asset filename".to_string());
+    }
+    if !trimmed
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-')
+    {
+        return Err("Unsafe characters in update asset filename".to_string());
+    }
+    if trimmed.contains("..") {
+        return Err("Path traversal disallowed in update asset filename".to_string());
+    }
+    #[cfg(target_os = "windows")]
+    if !trimmed.to_ascii_lowercase().ends_with(".exe")
+        && !trimmed.to_ascii_lowercase().ends_with(".msi")
+    {
+        return Err("Windows update asset must be a .exe or .msi installer".to_string());
+    }
+    Ok(trimmed.to_string())
+}
+
+#[tauri::command]
+async fn desktop_download_and_install_update(
+    app: tauri::AppHandle,
+    download_url: String,
+    file_name: String,
+    expected_sha256: Option<String>,
+    silent_install: bool,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let parsed = Url::parse(&download_url).map_err(|e| format!("Invalid update URL: {e}"))?;
+        if parsed.scheme() != "https" {
+            return Err("Update downloads must use HTTPS".to_string());
+        }
+        let host = parsed.host_str().unwrap_or_default();
+        if !is_allowed_update_host(host) {
+            return Err(format!("Untrusted update host blocked: {host}"));
+        }
+
+        let safe_name = sanitize_installer_filename(&file_name)?;
+        let response = ureq::get(parsed.as_str())
+            .set("User-Agent", "Pulse-Desktop-Updater/1.0")
+            .call()
+            .map_err(|e| format!("Failed to download update installer: {e}"))?;
+
+        let final_url = Url::parse(response.get_url())
+            .map_err(|e| format!("Invalid redirected update URL: {e}"))?;
+        if final_url.scheme() != "https"
+            || !is_allowed_update_host(final_url.host_str().unwrap_or_default())
+        {
+            return Err("Blocked redirect to untrusted update host".to_string());
+        }
+
+        let mut bytes = Vec::new();
+        response
+            .into_reader()
+            .take(MAX_INSTALLER_BYTES)
+            .read_to_end(&mut bytes)
+            .map_err(|e| format!("Interrupted while downloading update installer: {e}"))?;
+
+        if bytes.len() < 1024 {
+            return Err("Downloaded installer payload was unexpectedly small".to_string());
+        }
+
+        if let Some(expected_raw) = expected_sha256 {
+            let expected_hex = expected_raw
+                .trim()
+                .trim_start_matches("sha256:")
+                .to_ascii_lowercase();
+            if !expected_hex.is_empty() {
+                let mut hasher = Sha256::new();
+                hasher.update(&bytes);
+                let actual_hex = format!("{:x}", hasher.finalize());
+                if actual_hex != expected_hex {
+                    return Err(
+                        "SHA-256 checksum mismatch on downloaded installer — update aborted for safety"
+                            .to_string(),
+                    );
+                }
+            }
+        }
+
+        let update_dir = std::env::temp_dir().join("pulse-updates");
+        fs::create_dir_all(&update_dir)
+            .map_err(|e| format!("Failed to create temporary update folder: {e}"))?;
+        let dest_path = update_dir.join(&safe_name);
+        fs::write(&dest_path, &bytes)
+            .map_err(|e| format!("Failed to save update installer to {}: {e}", dest_path.display()))?;
+
+        #[cfg(target_os = "windows")]
+        {
+            let mut cmd = Command::new(&dest_path);
+            if silent_install {
+                cmd.arg("/S");
+            }
+            cmd.spawn()
+                .map_err(|e| format!("Failed to launch Windows update installer: {e}"))?;
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = silent_install;
+            open::that_detached(&dest_path)
+                .map_err(|e| format!("Failed to open downloaded update package: {e}"))?;
+        }
+
+        let app_for_exit = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(450));
+            app_for_exit.exit(0);
+        });
+
+        Ok(dest_path.to_string_lossy().into_owned())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 async fn listen_loopback_oauth(
     port: u16,
@@ -207,6 +339,7 @@ pub fn run() {
             desktop_read_settings,
             desktop_write_settings,
             desktop_open_settings_dir,
+            desktop_download_and_install_update,
             listen_loopback_oauth
         ])
         .run(tauri::generate_context!())

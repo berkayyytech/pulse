@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Laptop, RefreshCw, Speaker } from 'lucide-react';
+import { Check, Disc3, Laptop, RefreshCw, Speaker } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
 import { playerController } from './playerController';
 
@@ -10,12 +10,17 @@ export function DevicePicker() {
   const sdkDeviceId = usePlayerStore((s) => s.sdkDeviceId);
   const engine = usePlayerStore((s) => s.engine);
 
+  const displayName =
+    engine === 'html-audio'
+      ? 'Pulse Local Player'
+      : (activeDevice?.name ?? (engine === 'sdk' ? 'Pulse SDK' : 'Connect Devices'));
+
   return (
     <div style={{ position: 'relative' }}>
       <button
         type="button"
         aria-expanded={open}
-        aria-label="Spotify Connect devices"
+        aria-label="Playback output device"
         onClick={() => {
           const next = !open;
           setOpen(next);
@@ -24,13 +29,11 @@ export function DevicePicker() {
           }
         }}
         className="pulse-mono-pill"
-        data-tone="signal"
+        data-tone={engine === 'html-audio' ? 'accent' : 'signal'}
         style={{ cursor: 'pointer', padding: '0.3rem 0.65rem' }}
       >
-        <Speaker size={14} aria-hidden="true" />
-        <span>
-          {activeDevice?.name ?? (engine === 'sdk' ? 'Pulse SDK' : 'Connect Devices')}
-        </span>
+        {engine === 'html-audio' ? <Disc3 size={14} aria-hidden="true" /> : <Speaker size={14} aria-hidden="true" />}
+        <span>{displayName}</span>
       </button>
 
       {open ? (
@@ -42,7 +45,7 @@ export function DevicePicker() {
             position: 'absolute',
             right: 0,
             bottom: 'calc(100% + 10px)',
-            width: '300px',
+            width: '310px',
             boxShadow: 'var(--pulse-shadow-elevated)',
             zIndex: 80,
           }}
@@ -55,7 +58,7 @@ export function DevicePicker() {
               marginBottom: '0.6rem',
             }}
           >
-            <strong style={{ fontSize: '0.9rem' }}>Spotify Connect Targets</strong>
+            <strong style={{ fontSize: '0.9rem' }}>Playback Engines & Targets</strong>
             <button
               type="button"
               aria-label="Refresh devices"
@@ -73,28 +76,46 @@ export function DevicePicker() {
             </button>
           </div>
 
-          {sdkDeviceId ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.5rem' }}>
             <button
               type="button"
               className="pulse-nav-btn"
               onClick={() => {
-                void playerController.transferToDevice(sdkDeviceId);
+                void playerController.transferToDevice('pulse-local-audio');
                 setOpen(false);
               }}
             >
-              <Laptop size={15} aria-hidden="true" />
-              <span style={{ flex: 1 }}>Pulse Web Player (Local SDK)</span>
-              {engine === 'sdk' ? <Check size={14} color="var(--pulse-color-signal)" /> : null}
+              <Disc3 size={15} color="var(--pulse-color-accent)" aria-hidden="true" />
+              <span style={{ flex: 1, textAlign: 'left' }}>Pulse Local Audio Engine</span>
+              {engine === 'html-audio' ? <Check size={14} color="var(--pulse-color-signal)" /> : null}
             </button>
-          ) : null}
+
+            {sdkDeviceId ? (
+              <button
+                type="button"
+                className="pulse-nav-btn"
+                onClick={() => {
+                  void playerController.transferToDevice(sdkDeviceId);
+                  setOpen(false);
+                }}
+              >
+                <Laptop size={15} aria-hidden="true" />
+                <span style={{ flex: 1, textAlign: 'left' }}>Pulse Web Player (Spotify SDK)</span>
+                {engine === 'sdk' ? <Check size={14} color="var(--pulse-color-signal)" /> : null}
+              </button>
+            ) : null}
+          </div>
+
+          <div style={{ fontSize: '0.78rem', color: 'var(--pulse-color-text-muted)', margin: '0.4rem 0 0.3rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Spotify Connect Devices
+          </div>
 
           {devices.length === 0 ? (
-            <p style={{ fontSize: '0.82rem', color: 'var(--pulse-color-text-secondary)', margin: '0.4rem 0 0' }}>
-              No active Spotify Connect devices detected. Open Spotify on your desktop, phone, or
-              browser to remote-control it here.
+            <p style={{ fontSize: '0.82rem', color: 'var(--pulse-color-text-secondary)', margin: '0.2rem 0 0' }}>
+              No active Spotify Connect devices detected. Open Spotify on your desktop or phone to remote control it.
             </p>
           ) : (
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               {devices.map((dev, idx) => (
                 <li key={dev.id ?? `${dev.name}_${idx}`}>
                   <button
@@ -109,10 +130,10 @@ export function DevicePicker() {
                     }}
                   >
                     <Speaker size={15} aria-hidden="true" />
-                    <span style={{ flex: 1 }}>
+                    <span style={{ flex: 1, textAlign: 'left' }}>
                       {dev.name} <small>({dev.type})</small>
                     </span>
-                    {dev.is_active ? <Check size={14} color="var(--pulse-color-signal)" /> : null}
+                    {dev.is_active && engine !== 'html-audio' ? <Check size={14} color="var(--pulse-color-signal)" /> : null}
                   </button>
                 </li>
               ))}

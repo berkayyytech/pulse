@@ -26,7 +26,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' https://sdk.scdn.co; worker-src 'self' blob:; frame-src https://sdk.scdn.co; connect-src 'self' https://api.spotify.com https://accounts.spotify.com https://*.scdn.co https://lrclib.net https://musicbrainz.org https://coverartarchive.org https://ws.audioscrobbler.com; img-src 'self' data: blob: https://*.scdn.co https://*.spotifycdn.com https://coverartarchive.org https://*.archive.org; style-src 'self' 'unsafe-inline'; media-src 'self' blob: https://*.scdn.co;"
+      "csp": "default-src 'self'; script-src 'self' https://sdk.scdn.co; worker-src 'self' blob:; frame-src https://sdk.scdn.co; connect-src 'self' https://api.spotify.com https://accounts.spotify.com https://*.scdn.co https://api.github.com https://lrclib.net https://musicbrainz.org https://coverartarchive.org https://ws.audioscrobbler.com; img-src 'self' data: blob: https://*.scdn.co https://*.spotifycdn.com https://coverartarchive.org https://*.archive.org; style-src 'self' 'unsafe-inline'; media-src 'self' blob: https://*.scdn.co;"
     }
   },
   "bundle": {

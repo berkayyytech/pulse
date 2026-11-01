@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
@@ -5,9 +6,15 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const pkgJson = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, './package.json'), 'utf8'),
+) as { version?: string };
 
 export default defineConfig({
   clearScreen: false,
+  define: {
+    __PULSE_APP_VERSION__: JSON.stringify(pkgJson.version ?? '0.1.0'),
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

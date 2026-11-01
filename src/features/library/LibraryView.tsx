@@ -1,8 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Disc3, FolderPlus, Lock, Users } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Disc3, FolderPlus, Lock, Plus, Users } from 'lucide-react';
 import { getSpotifyClient } from '@/api/clientInstance';
 import type { FullAlbum, FullArtist, SimplifiedAlbum, Track } from '@/api/schemas/catalog';
 import type { FullPlaylist, SimplifiedPlaylist } from '@/api/schemas/playlist';
+import {
+  CURATED_OPEN_TRACKS,
+  getCuratedAndLocalTracks,
+  importAudioFiles,
+} from '@/features/local-audio/localAudioService';
 import { fetchOptInArtistEnrichment, type ExternalArtistMetadata } from '@/features/lyrics/externalMetadataService';
 import { useAchievementStore } from '@/stores/achievementStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -10,7 +15,7 @@ import { useThemeStore } from '@/stores/themeStore';
 import { useUiStore } from '@/stores/uiStore';
 import { VirtualizedTrackList } from './VirtualizedTrackList';
 
-type LibraryTab = 'playlists' | 'tracks' | 'albums' | 'artists';
+type LibraryTab = 'playlists' | 'tracks' | 'albums' | 'artists' | 'local';
 
 export default function LibraryView() {
   const authStatus = useAuthStore((s) => s.status);
@@ -23,10 +28,15 @@ export default function LibraryView() {
   const setActiveRoute = useUiStore((s) => s.setActiveRoute);
   const collectionViewMode = useThemeStore((s) => s.density);
 
-  const [tab, setTab] = useState<LibraryTab>('playlists');
+  const [tab, setTab] = useState<LibraryTab>(() =>
+    authStatus === 'authenticated' || authStatus === 'demo' ? 'playlists' : 'local',
+  );
   const [playlists, setPlaylists] = useState<SimplifiedPlaylist[]>([]);
   const [activePlaylist, setActivePlaylist] = useState<FullPlaylist | null>(null);
   const [savedTracks, setSavedTracks] = useState<Track[]>([]);
+  const [localTracks, setLocalTracks] = useState<Track[]>(() => [...CURATED_OPEN_TRACKS]);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [savedAlbums, setSavedAlbums] = useState<FullAlbum[]>([]);
   const [followedArtists, setFollowedArtists] = useState<FullArtist[]>([]);
   const [newPlaylistName, setNewPlaylistName] = useState('');
@@ -39,6 +49,44 @@ export default function LibraryView() {
   } | null>(null);
 
   const isConnected = authStatus === 'authenticated' || authStatus === 'demo';
+
+  const refreshLocalTracks = useCallback(async () => {
+    try {
+      const items = await getCuratedAndLocalTracks();
+      setLocalTracks(items);
+    } catch {
+      setLocalTracks([...CURATED_OPEN_TRACKS]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshLocalTracks();
+  }, [refreshLocalTracks]);
+
+  const handleFileDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+    if (e.dataTransfer.files.length > 0) {
+      const imported = await importAudioFiles(e.dataTransfer.files);
+      if (imported.length > 0) {
+        useAchievementStore.getState().incrementMetric('tracksSavedCount', imported.length);
+        await refreshLocalTracks();
+        setTab('local');
+      }
+    }
+  };
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const imported = await importAudioFiles(e.target.files);
+      if (imported.length > 0) {
+        useAchievementStore.getState().incrementMetric('tracksSavedCount', imported.length);
+        await refreshLocalTracks();
+        setTab('local');
+      }
+      e.target.value = '';
+    }
+  };
 
   const loadLibrary = useCallback(async () => {
     if (!isConnected) {
@@ -98,28 +146,6 @@ export default function LibraryView() {
       })
       .catch(() => undefined);
   }, [focusedArtistId, isConnected]);
-
-  if (!isConnected) {
-    return (
-      <section className="pulse-card">
-        <h1 style={{ fontFamily: 'var(--pulse-font-display)', marginTop: 0 }}>Library</h1>
-        <p style={{ color: 'var(--pulse-color-text-secondary)' }}>
-          Connect your Spotify Client ID (or launch Offline Sample Mode) in Setup to browse your
-          playlists, saved tracks, albums, and followed artists.
-        </p>
-        <button
-          type="button"
-          className="pulse-nav-btn"
-          style={{ width: 'auto', border: '1px solid var(--pulse-color-border-strong)' }}
-          onClick={() => {
-            setActiveRoute('setup');
-          }}
-        >
-          Go to Client ID Setup
-        </button>
-      </section>
-    );
-  }
 
   // Album Detail Sub-View
   if (focusedAlbumId && albumDetail) {
@@ -284,9 +310,10 @@ export default function LibraryView() {
           Your Library
         </h1>
 
-        <div role="tablist" aria-label="Library sections" style={{ display: 'flex', gap: '0.4rem' }}>
+        <div role="tablist" aria-label="Library sections" style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
           {(
             [
+              ['local', `Local Audio (${localTracks.length})`],
               ['playlists', `Playlists (${playlists.length})`],
               ['tracks', `Liked Tracks (${savedTracks.length})`],
               ['albums', `Albums (${savedAlbums.length})`],
@@ -311,6 +338,120 @@ export default function LibraryView() {
           ))}
         </div>
       </div>
+
+      {!isConnected && tab !== 'local' ? (
+        <article className="pulse-card" style={{ marginBottom: '1.25rem' }}>
+          <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem' }}>Spotify Account Not Connected</h2>
+          <p style={{ color: 'var(--pulse-color-text-secondary)', margin: '0 0 1rem' }}>
+            To view your Spotify playlists, liked tracks, albums, and artists, connect your Spotify account in Setup. You can also listen to your own local audio files and royalty-free music anytime!
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="pulse-nav-btn"
+              style={{ width: 'auto', background: 'var(--pulse-color-accent)', color: 'var(--pulse-color-text-inverse)' }}
+              onClick={() => {
+                setTab('local');
+              }}
+            >
+              <Disc3 size={15} />
+              <span>Switch to Local Audio</span>
+            </button>
+            <button
+              type="button"
+              className="pulse-nav-btn"
+              style={{ width: 'auto', border: '1px solid var(--pulse-color-border-strong)' }}
+              onClick={() => {
+                setActiveRoute('setup');
+              }}
+            >
+              <span>Go to Setup</span>
+            </button>
+          </div>
+        </article>
+      ) : null}
+
+      {tab === 'local' ? (
+        <div>
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDraggingOver(true);
+            }}
+            onDragLeave={() => {
+              setIsDraggingOver(false);
+            }}
+            onDrop={(e) => {
+              void handleFileDrop(e);
+            }}
+            style={{
+              padding: '1.25rem',
+              borderRadius: 'var(--pulse-radius-md)',
+              border: `2px dashed ${
+                isDraggingOver ? 'var(--pulse-color-accent)' : 'var(--pulse-color-border-strong)'
+              }`,
+              background: isDraggingOver
+                ? 'var(--pulse-color-bg-elevated)'
+                : 'var(--pulse-color-bg-canvas)',
+              marginBottom: '1.25rem',
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '1rem',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
+                <Disc3 size={18} color="var(--pulse-color-accent)" />
+                <span>Drag & Drop Audio Files Here</span>
+              </div>
+              <p style={{ margin: '0.25rem 0 0', color: 'var(--pulse-color-text-secondary)', fontSize: '0.86rem' }}>
+                Supports MP3, WAV, FLAC, OGG, M4A, AAC, and WEBM. Stored safely in your local desktop database.
+              </p>
+            </div>
+            <div>
+              <button
+                type="button"
+                className="pulse-nav-btn"
+                style={{
+                  background: 'var(--pulse-color-accent)',
+                  color: 'var(--pulse-color-text-inverse)',
+                  fontWeight: 600,
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  gap: '0.45rem',
+                }}
+                onClick={() => {
+                  fileInputRef.current?.click();
+                }}
+              >
+                <Plus size={16} />
+                <span>Import Audio Files</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac,.webm"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  void handleFileInputChange(e);
+                }}
+              />
+            </div>
+          </div>
+
+          <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>
+            Local & Curated Open Audio ({localTracks.length})
+          </h2>
+          <VirtualizedTrackList
+            tracks={localTracks}
+            ownedPlaylists={playlists}
+          />
+        </div>
+      ) : null}
 
       {tab === 'playlists' ? (
         activePlaylist ? (

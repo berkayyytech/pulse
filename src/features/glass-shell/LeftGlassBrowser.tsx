@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ArrowLeft, Disc3, Search } from 'lucide-react';
+import { ArrowLeft, Disc3, Plus, Search } from 'lucide-react';
 import { getSpotifyClient } from '@/api/clientInstance';
 import { DEMO_TRACKS, DEMO_USER } from '@/api/demoCatalog';
 import type { Track } from '@/api/schemas/catalog';
 import type { FullPlaylist, SimplifiedPlaylist } from '@/api/schemas/playlist';
+import {
+  CURATED_OPEN_TRACKS,
+  getCuratedAndLocalTracks,
+  importAudioFiles,
+} from '@/features/local-audio/localAudioService';
 import { DevicePicker } from '@/features/player/DevicePicker';
 import { formatDurationMs } from '@/features/player/formatTime';
 import { playerController } from '@/features/player/playerController';
@@ -20,7 +25,7 @@ const FALLBACK_THUMB =
     '<svg xmlns="http://www.w3.org/2000/svg" width="92" height="92"><rect width="92" height="92" rx="18" fill="#2A3142"/><circle cx="46" cy="46" r="22" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="5" fill="none"/></svg>',
   );
 
-type LibrarySubFilter = 'tracks' | 'playlists';
+type LibrarySubFilter = 'tracks' | 'playlists' | 'local';
 
 export function LeftGlassBrowser() {
   const leftPaneTab = useUiStore((s) => s.leftPaneTab);
@@ -42,6 +47,9 @@ export function LeftGlassBrowser() {
 
   const [libSubFilter, setLibSubFilter] = useState<LibrarySubFilter>('tracks');
   const [savedTracks, setSavedTracks] = useState<Track[]>(() => [...DEMO_TRACKS]);
+  const [localTracks, setLocalTracks] = useState<Track[]>(() => [...CURATED_OPEN_TRACKS]);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [playlists, setPlaylists] = useState<SimplifiedPlaylist[]>([]);
   const [openedPlaylist, setOpenedPlaylist] = useState<FullPlaylist | null>(null);
   const [statusNote, setStatusNote] = useState<string>('');
@@ -49,6 +57,44 @@ export function LeftGlassBrowser() {
 
   const isConnected = authStatus === 'authenticated' || authStatus === 'demo';
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const refreshLocalTracks = useCallback(async () => {
+    try {
+      const items = await getCuratedAndLocalTracks();
+      setLocalTracks(items);
+    } catch {
+      setLocalTracks([...CURATED_OPEN_TRACKS]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshLocalTracks();
+  }, [refreshLocalTracks]);
+
+  const handleFileDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+    if (e.dataTransfer.files.length > 0) {
+      const imported = await importAudioFiles(e.dataTransfer.files);
+      if (imported.length > 0) {
+        useAchievementStore.getState().incrementMetric('tracksSavedCount', imported.length);
+        await refreshLocalTracks();
+        setLibSubFilter('local');
+      }
+    }
+  };
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const imported = await importAudioFiles(e.target.files);
+      if (imported.length > 0) {
+        useAchievementStore.getState().incrementMetric('tracksSavedCount', imported.length);
+        await refreshLocalTracks();
+        setLibSubFilter('local');
+      }
+      e.target.value = '';
+    }
+  };
 
   // Load saved library items when connected
   const refreshLibraryData = useCallback(async () => {
@@ -127,6 +173,17 @@ export function LeftGlassBrowser() {
     if (leftPaneTab === 'search') {
       return searchTracks;
     }
+    if (libSubFilter === 'local') {
+      const trimmed = query.trim().toLowerCase();
+      if (!trimmed) {
+        return localTracks;
+      }
+      return localTracks.filter(
+        (t) =>
+          t.name.toLowerCase().includes(trimmed) ||
+          t.artists.some((a) => a.name.toLowerCase().includes(trimmed)),
+      );
+    }
     const baseList = openedPlaylist
       ? (openedPlaylist.items?.items
           .map((i) => i.item)
@@ -141,7 +198,7 @@ export function LeftGlassBrowser() {
         t.name.toLowerCase().includes(trimmed) ||
         t.artists.some((a) => a.name.toLowerCase().includes(trimmed)),
     );
-  }, [leftPaneTab, openedPlaylist, query, savedTracks, searchTracks]);
+  }, [leftPaneTab, libSubFilter, localTracks, openedPlaylist, query, savedTracks, searchTracks]);
 
   const estimatedRowHeight = density === 'compact' ? 46 : density === 'spacious' ? 76 : 62;
 
@@ -263,6 +320,18 @@ export function LeftGlassBrowser() {
               >
                 Playlists ({playlists.length})
               </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={libSubFilter === 'local'}
+                className="gp-seg-pill"
+                style={{ padding: '4px 12px', fontSize: '12px' }}
+                onClick={() => {
+                  setLibSubFilter('local');
+                }}
+              >
+                Local ({localTracks.length})
+              </button>
             </div>
           )}
 
@@ -286,11 +355,66 @@ export function LeftGlassBrowser() {
         </div>
       ) : null}
 
+      {/* Local Files Import Banner */}
+      {leftPaneTab === 'library' && libSubFilter === 'local' ? (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '8px',
+            marginBottom: '8px',
+            padding: '6px 10px',
+            background: 'var(--pulse-color-bg-elevated)',
+            borderRadius: 'var(--pulse-radius-sm)',
+            border: '1px dashed var(--pulse-color-border-subtle)',
+            fontSize: '12px',
+          }}
+        >
+          <span style={{ color: 'var(--pulse-color-text-secondary)' }}>
+            Drag & drop audio files here
+          </span>
+          <button
+            type="button"
+            className="pulse-nav-btn"
+            style={{ width: 'auto', padding: '3px 8px', fontSize: '11.5px', gap: '4px' }}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Plus size={13} />
+            <span>Add Audio</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac,.webm"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              void handleFileInputChange(e);
+            }}
+          />
+        </div>
+      ) : null}
+
       {/* Scrollable Track / Playlist List */}
       <div
         ref={scrollContainerRef}
         className="gp-scroll-list"
         data-hide-thumbs={!showTrackArtwork}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDraggingOver(true);
+        }}
+        onDragLeave={() => {
+          setIsDraggingOver(false);
+        }}
+        onDrop={(e) => {
+          void handleFileDrop(e);
+        }}
+        style={{
+          border: isDraggingOver ? '2px dashed var(--pulse-color-accent)' : undefined,
+          backgroundColor: isDraggingOver ? 'var(--pulse-color-bg-elevated)' : undefined,
+        }}
         role="listbox"
         aria-label={showPlaylistsGrid ? 'Playlists' : 'Tracks'}
       >

@@ -4,10 +4,14 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  Disc3,
   ExternalLink,
+  FolderOpen,
   KeyRound,
   LogOut,
   Play,
+  Radio,
+  Sparkles,
   Trash2,
 } from 'lucide-react';
 import { runStartupCapabilityProbes } from '@/api/capabilities';
@@ -15,7 +19,9 @@ import { getSpotifyClient } from '@/api/clientInstance';
 import { DEMO_USER } from '@/api/demoCatalog';
 import { DEMO_TRACKS } from '@/api/demoCatalog';
 import { getValidAccessToken, signOutSpotify, startPkceLogin } from '@/features/auth/authService';
+import { CURATED_OPEN_TRACKS } from '@/features/local-audio/localAudioService';
 import { playerController } from '@/features/player/playerController';
+import { scheduleDesktopSettingsSave } from '@/platform/desktopSettingsSync';
 import { openExternalUrl } from '@/platform/openExternal';
 import { isTauriRuntime } from '@/platform/runtime';
 import { resolveRedirectUri } from '@/platform/redirectUri';
@@ -24,6 +30,7 @@ import {
   isValidSpotifyClientId,
   normalizeClientIdInput,
   useAuthStore,
+  type AccountTier,
 } from '@/stores/authStore';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useUiStore } from '@/stores/uiStore';
@@ -31,6 +38,8 @@ import { useUiStore } from '@/stores/uiStore';
 export function OnboardingWizard() {
   const storedClientId = useAuthStore((s) => s.clientId);
   const authStatus = useAuthStore((s) => s.status);
+  const accountTier = useAuthStore((s) => s.accountTier);
+  const setAccountTier = useAuthStore((s) => s.setAccountTier);
   const currentUser = useAuthStore((s) => s.user);
   const diagnostic = useAuthStore((s) => s.diagnostic);
   const setClientId = useAuthStore((s) => s.setClientId);
@@ -51,6 +60,21 @@ export function OnboardingWizard() {
   const redirectCheck = resolveRedirectUri();
   const normalizedDraft = normalizeClientIdInput(draftClientId);
   const isDraftValid = isValidSpotifyClientId(normalizedDraft);
+
+  const handleSelectTier = (tier: AccountTier) => {
+    setAccountTier(tier);
+    scheduleDesktopSettingsSave();
+    if (tier === 'local-only') {
+      const firstTrack = CURATED_OPEN_TRACKS[0];
+      if (firstTrack) {
+        void playerController.playTrack(firstTrack);
+      }
+      useAchievementStore.getState().setFlag('sampleLibraryLaunched');
+      setActiveRoute('library');
+      useUiStore.getState().setLeftPaneTab('library');
+      useUiStore.getState().setSettingsSheetOpen(false);
+    }
+  };
 
   const handleCopyRedirectUri = async () => {
     try {
@@ -123,13 +147,197 @@ export function OnboardingWizard() {
           margin: '0.75rem 0 0.5rem',
         }}
       >
-        Connect Your Own Spotify Client ID
+        Connect Your Own Spotify Client ID & Playback Modes
       </h1>
-      <p style={{ color: 'var(--pulse-color-text-secondary)', maxWidth: '70ch', marginTop: 0 }}>
-        Under Spotify’s 2026 Development Mode rules, each developer app is capped at ~5 allowlisted
-        users and requires the app owner to hold active Spotify Premium. By supplying your own free
-        Client ID, Pulse stays fast, private, and immune to shared-key shutdowns.
+      <p style={{ color: 'var(--pulse-color-text-secondary)', maxWidth: '75ch', marginTop: 0 }}>
+        Pulse is built for everyone. Choose how you want to listen: use our built-in local audio player with zero account required, connect your free Spotify account for lyrics & remote control, or unlock full in-app Web Playback SDK streaming with Spotify Premium.
       </p>
+
+      {/* Mode Selection Cards */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: '1rem',
+          margin: '1.25rem 0 1.75rem',
+        }}
+      >
+        {/* Mode 1: Local & Free Music Player */}
+        <article
+          className="pulse-card"
+          style={{
+            borderColor:
+              accountTier === 'local-only'
+                ? 'var(--pulse-color-accent)'
+                : 'var(--pulse-color-border-subtle)',
+            background:
+              accountTier === 'local-only'
+                ? 'var(--pulse-color-bg-elevated)'
+                : 'var(--pulse-color-bg-canvas)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}
+          onClick={() => {
+            handleSelectTier('local-only');
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span className="pulse-mono-pill" data-tone="accent">
+                100% Free • No Login
+              </span>
+              {accountTier === 'local-only' ? (
+                <CheckCircle2 size={18} color="var(--pulse-color-signal)" />
+              ) : null}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+              <Disc3 size={20} color="var(--pulse-color-accent)" />
+              <strong style={{ fontSize: '1.05rem' }}>Local & Royalty-Free Player</strong>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--pulse-color-text-secondary)', margin: 0, lineHeight: 1.45 }}>
+              Zero Spotify account required. Drag & drop your local audio files (MP3, FLAC, WAV, M4A) and enjoy built-in curated Lofi, Synthwave, and procedural ambient music!
+            </p>
+          </div>
+          <button
+            type="button"
+            className="pulse-nav-btn"
+            style={{
+              marginTop: '1rem',
+              justifyContent: 'center',
+              fontWeight: 600,
+              background: 'var(--pulse-color-accent)',
+              color: 'var(--pulse-color-text-inverse)',
+              border: 'none',
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSelectTier('local-only');
+            }}
+          >
+            <FolderOpen size={15} />
+            <span>Launch Local Music Player</span>
+          </button>
+        </article>
+
+        {/* Mode 2: Spotify Free Companion */}
+        <article
+          className="pulse-card"
+          style={{
+            borderColor:
+              accountTier === 'spotify-free'
+                ? 'var(--pulse-color-signal)'
+                : 'var(--pulse-color-border-subtle)',
+            background:
+              accountTier === 'spotify-free'
+                ? 'var(--pulse-color-bg-elevated)'
+                : 'var(--pulse-color-bg-canvas)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}
+          onClick={() => {
+            handleSelectTier('spotify-free');
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span className="pulse-mono-pill" data-tone="signal">
+                Free Spotify Account
+              </span>
+              {accountTier === 'spotify-free' ? (
+                <CheckCircle2 size={18} color="var(--pulse-color-signal)" />
+              ) : null}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+              <Radio size={20} color="var(--pulse-color-signal)" />
+              <strong style={{ fontSize: '1.05rem' }}>Spotify Free Companion</strong>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--pulse-color-text-secondary)', margin: 0, lineHeight: 1.45 }}>
+              Browse your playlists & library, get synchronized LRCLIB lyrics, and control your Spotify desktop or mobile app via Spotify Connect without SDK 403 errors.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="pulse-nav-btn"
+            style={{
+              marginTop: '1rem',
+              justifyContent: 'center',
+              fontWeight: 600,
+              border: '1px solid var(--pulse-color-border-strong)',
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSelectTier('spotify-free');
+            }}
+          >
+            <Check size={15} />
+            <span>{accountTier === 'spotify-free' ? 'Selected' : 'Use Spotify Free Mode'}</span>
+          </button>
+        </article>
+
+        {/* Mode 3: Spotify Premium */}
+        <article
+          className="pulse-card"
+          style={{
+            borderColor:
+              accountTier === 'spotify-premium'
+                ? 'var(--pulse-color-signal)'
+                : 'var(--pulse-color-border-subtle)',
+            background:
+              accountTier === 'spotify-premium'
+                ? 'var(--pulse-color-bg-elevated)'
+                : 'var(--pulse-color-bg-canvas)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}
+          onClick={() => {
+            handleSelectTier('spotify-premium');
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span className="pulse-mono-pill" data-tone="neutral">
+                Spotify Premium
+              </span>
+              {accountTier === 'spotify-premium' ? (
+                <CheckCircle2 size={18} color="var(--pulse-color-signal)" />
+              ) : null}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+              <Sparkles size={20} color="var(--pulse-color-accent)" />
+              <strong style={{ fontSize: '1.05rem' }}>Spotify Premium</strong>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--pulse-color-text-secondary)', margin: 0, lineHeight: 1.45 }}>
+              Direct in-app Web Playback SDK streaming without opening any external apps, plus seamless transfer to all Spotify Connect smart speakers and devices.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="pulse-nav-btn"
+            style={{
+              marginTop: '1rem',
+              justifyContent: 'center',
+              fontWeight: 600,
+              border: '1px solid var(--pulse-color-border-strong)',
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSelectTier('spotify-premium');
+            }}
+          >
+            <Check size={15} />
+            <span>{accountTier === 'spotify-premium' ? 'Selected' : 'Use Spotify Premium Mode'}</span>
+          </button>
+        </article>
+      </div>
 
       {(authStatus === 'authenticated' || authStatus === 'demo') && currentUser ? (
         <article

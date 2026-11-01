@@ -11,17 +11,20 @@ import { useAuthStore } from '@/stores/authStore';
 import { usePlayerStore } from '@/stores/playerStore';
 import { usePluginStore } from '@/stores/pluginStore';
 import { useThemeStore } from '@/stores/themeStore';
+import { useUpdaterStore } from '@/stores/updaterStore';
 import { isTauriRuntime } from './runtime';
 
 export const PERSISTED_LOCAL_STORAGE_KEYS = [
   'pulse.ui.theme',
   'pulse.spotify.clientId',
+  'pulse.auth.accountTier',
   'pulse.local.achievements.v1',
   'pulse.ui.shortcuts',
   'pulse.privacy.listeningHistoryOptIn',
   'pulse.privacy.externalSources',
   'pulse.player.prefs',
   'pulse.plugins.installed',
+  'pulse.updater.prefs',
 ] as const;
 
 export interface DesktopSettingsBundle {
@@ -165,6 +168,7 @@ export async function hydrateDesktopSettingsFromDisk(): Promise<string | null> {
       usePlayerStore.getState().reloadFromStorage();
       usePluginStore.getState().reloadFromStorage();
       useShortcutStore.getState().reloadFromStorage();
+      useUpdaterStore.getState().reloadFromStorage();
       useAchievementStore.getState().reloadFromStorage();
       useAchievementStore.getState().recordAppBoot();
 
@@ -222,6 +226,18 @@ export function startDesktopSettingsSync(): () => void {
     }),
     useShortcutStore.subscribe(() => {
       scheduleDesktopSettingsSave();
+    }),
+    useUpdaterStore.subscribe((next, prev) => {
+      if (
+        next.checkOnStartup !== prev.checkOnStartup ||
+        next.autoInstallUpdates !== prev.autoInstallUpdates ||
+        next.includePrereleases !== prev.includePrereleases ||
+        next.repoSlug !== prev.repoSlug ||
+        next.skippedVersion !== prev.skippedVersion ||
+        next.lastCheckedAtIso !== prev.lastCheckedAtIso
+      ) {
+        scheduleDesktopSettingsSave();
+      }
     }),
     useAchievementStore.subscribe((next, prev) => {
       if (

@@ -22,6 +22,7 @@ import {
   initializeWebPlaybackSdk,
 } from '@/features/player/webPlaybackSdk';
 import { QueueDrawer } from '@/features/queue/QueueDrawer';
+import { UpdateBanner } from '@/features/updater/UpdateBanner';
 import { t } from '@/i18n';
 import {
   flushDesktopSettingsToDisk,
@@ -36,6 +37,7 @@ import { useCapabilityStore } from '@/stores/capabilityStore';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { useUiStore } from '@/stores/uiStore';
+import { useUpdaterStore } from '@/stores/updaterStore';
 import { ApiStatusBanner } from './ApiStatusBanner';
 
 export function App() {
@@ -139,9 +141,40 @@ export function App() {
     };
     document.addEventListener('click', handleExternalAnchorClick);
 
+    // Background GitHub Releases update check (startup + every 6h when enabled, skipped in automated tests)
+    const isAutomatedTest =
+      import.meta.env.MODE === 'test' ||
+      (typeof navigator !== 'undefined' && navigator.webdriver);
+
+    let startupUpdateTimer: ReturnType<typeof setTimeout> | null = null;
+    let periodicUpdateTimer: ReturnType<typeof setInterval> | null = null;
+
+    if (!isAutomatedTest && windowMode === 'full') {
+      startupUpdateTimer = setTimeout(() => {
+        if (useUpdaterStore.getState().checkOnStartup) {
+          void useUpdaterStore.getState().checkForUpdates({ manual: false });
+        }
+      }, 2800);
+
+      periodicUpdateTimer = setInterval(
+        () => {
+          if (useUpdaterStore.getState().checkOnStartup) {
+            void useUpdaterStore.getState().checkForUpdates({ manual: false });
+          }
+        },
+        6 * 60 * 60 * 1000,
+      );
+    }
+
     return () => {
       stopDesktopSync();
       clearInterval(tick);
+      if (startupUpdateTimer !== null) {
+        clearTimeout(startupUpdateTimer);
+      }
+      if (periodicUpdateTimer !== null) {
+        clearInterval(periodicUpdateTimer);
+      }
       unsubTheme();
       document.removeEventListener('click', handleExternalAnchorClick);
     };
@@ -492,6 +525,7 @@ export function App() {
       <QueueDrawer />
       <LyricsDrawer />
       <CommandPaletteModal />
+      <UpdateBanner />
       <EasterEggOverlay />
     </div>
   );

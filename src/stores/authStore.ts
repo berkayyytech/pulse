@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import type { UserProfile } from '@/api/schemas/user';
 
 const CLIENT_ID_STORAGE_KEY = 'pulse.spotify.clientId';
+const ACCOUNT_TIER_STORAGE_KEY = 'pulse.auth.accountTier';
+
+export type AccountTier = 'spotify-premium' | 'spotify-free' | 'local-only';
 
 export type AuthStatus =
   | 'unconfigured'
@@ -27,9 +30,11 @@ export interface HumanAuthDiagnostic {
 interface AuthState {
   readonly clientId: string | null;
   readonly status: AuthStatus;
+  readonly accountTier: AccountTier;
   readonly user: UserProfile | null;
   readonly diagnostic: HumanAuthDiagnostic | null;
   setClientId: (clientId: string | null) => void;
+  setAccountTier: (tier: AccountTier) => void;
   setAuthenticating: () => void;
   setAuthenticated: (user: UserProfile) => void;
   setDemoSession: (user: UserProfile) => void;
@@ -48,6 +53,17 @@ export function isValidSpotifyClientId(value: string): boolean {
   return CLIENT_ID_HEX_REGEX.test(normalizeClientIdInput(value));
 }
 
+function readStoredAccountTier(): AccountTier {
+  if (typeof localStorage === 'undefined') {
+    return 'spotify-premium';
+  }
+  const raw = localStorage.getItem(ACCOUNT_TIER_STORAGE_KEY);
+  if (raw === 'spotify-premium' || raw === 'spotify-free' || raw === 'local-only') {
+    return raw;
+  }
+  return 'spotify-premium';
+}
+
 function readStoredClientId(): string | null {
   if (typeof localStorage === 'undefined') {
     return null;
@@ -61,9 +77,11 @@ function readStoredClientId(): string | null {
 
 export const useAuthStore = create<AuthState>((set) => {
   const initialClientId = readStoredClientId();
+  const initialAccountTier = readStoredAccountTier();
   return {
     clientId: initialClientId,
     status: initialClientId ? 'signed-out' : 'unconfigured',
+    accountTier: initialAccountTier,
     user: null,
     diagnostic: null,
     setClientId: (clientId) => {
@@ -81,6 +99,12 @@ export const useAuthStore = create<AuthState>((set) => {
         user: null,
         diagnostic: null,
       });
+    },
+    setAccountTier: (tier) => {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(ACCOUNT_TIER_STORAGE_KEY, tier);
+      }
+      set({ accountTier: tier });
     },
     setAuthenticating: () => {
       set({ status: 'authenticating', diagnostic: null });
@@ -103,8 +127,10 @@ export const useAuthStore = create<AuthState>((set) => {
     },
     reloadFromStorage: () => {
       const reloadedClientId = readStoredClientId();
+      const reloadedTier = readStoredAccountTier();
       set((state) => ({
         clientId: reloadedClientId,
+        accountTier: reloadedTier,
         status:
           state.status === 'authenticated' || state.status === 'demo'
             ? state.status

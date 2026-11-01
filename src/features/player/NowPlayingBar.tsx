@@ -163,6 +163,10 @@ export function NowPlayingBar() {
                 <span>Open on Spotify</span>
                 <ExternalLink size={11} aria-hidden="true" />
               </a>
+            ) : currentTrack?.is_local ? (
+              <span className="pulse-mono-pill" data-tone="accent" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                Local Audio
+              </span>
             ) : null}
             <PluginSlotView slot="now-playing-badge" />
           </div>
