@@ -224,10 +224,33 @@ async fn desktop_download_and_install_update(
         }
 
         let safe_name = sanitize_installer_filename(&file_name)?;
-        let response = ureq::get(parsed.as_str())
+        let mut resp_res = ureq::get(parsed.as_str())
             .set("User-Agent", "Pulse-Desktop-Updater/1.0")
-            .call()
-            .map_err(|e| format!("Failed to download update installer: {e}"))?;
+            .call();
+
+        // If downloading the specified asset returned an error and it's a GitHub release download URL,
+        // try fallback standard installer names on the same release tag (e.g. Pulse_0.1.0_x64-setup.exe, Pulse.exe)
+        if resp_res.is_err() && parsed.as_str().contains("/releases/download/") {
+            let base_str = parsed.as_str();
+            if let Some(last_slash) = base_str.rfind('/') {
+                let release_prefix = &base_str[..last_slash];
+                let fallback_names = ["Pulse_0.1.0_x64-setup.exe", "Pulse.exe"];
+                for fb_name in fallback_names {
+                    let fb_url = format!("{release_prefix}/{fb_name}");
+                    if let Ok(p) = Url::parse(&fb_url) {
+                        if let Ok(r) = ureq::get(p.as_str())
+                            .set("User-Agent", "Pulse-Desktop-Updater/1.0")
+                            .call()
+                        {
+                            resp_res = Ok(r);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        let response = resp_res.map_err(|e| format!("Failed to download update installer: {e}"))?;
 
         let final_url = Url::parse(response.get_url())
             .map_err(|e| format!("Invalid redirected update URL: {e}"))?;

@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, height=720">
+  <title>Pulse — Audio Evolved</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #050b08;
+      color: #ffffff;
+      user-select: none;
+    }
+
+    /* Ambient Background Aura */
+    .backdrop {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 30%, #0d281e 0%, #050b08 70%);
+      transition: background 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 1;
+    }
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.55;
+      animation: floatOrb 12s ease-in-out infinite alternate;
+      z-index: 1;
+      transition: all 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .orb-1 {
+      width: 520px;
+      height: 520px;
+      top: -120px;
+      left: 10%;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.8) 0%, rgba(6, 95, 70, 0) 70%);
+    }
+    .orb-2 {
+      width: 480px;
+      height: 480px;
+      bottom: -100px;
+      right: 15%;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.7) 0%, rgba(14, 116, 144, 0) 70%);
+    }
+
+    @keyframes floatOrb {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(40px, 30px) scale(1.12); }
+    }
+
+    /* Top Brand Bar */
+    .brand-bar {
+      position: absolute;
+      top: 24px;
+      left: 40px;
+      right: 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 20;
+    }
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      font-size: 1.35rem;
+      letter-spacing: 0.08em;
+    }
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #10b981, #06b6d4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 18px rgba(16, 185, 129, 0.45);
+    }
+    .brand-icon svg {
+      width: 18px;
+      height: 18px;
+      fill: #ffffff;
+    }
+    .brand-badges {
+      display: flex;
+      gap: 10px;
+    }
+    .pill {
+      font-size: 0.76rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      backdrop-filter: blur(12px);
+      color: rgba(255, 255, 255, 0.88);
+    }
+    .pill.glow {
+      background: rgba(16, 185, 129, 0.16);
+      border-color: rgba(16, 185, 129, 0.45);
+      color: #34d399;
+      box-shadow: 0 0 16px rgba(16, 185, 129, 0.25);
+    }
+
+    /* Main Stage */
+    .stage {
+      position: absolute;
+      inset: 80px 40px 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 48px;
+      opacity: 0;
+      transform: translateY(24px) scale(0.97);
+      transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+    .slide.active {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+
+    .slide-text {
+      flex: 1;
+      max-width: 540px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .slide-tag {
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #10b981;
+    }
+    .slide-title {
+      font-size: 2.75rem;
+      font-weight: 800;
+      line-height: 1.14;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #ffffff 30%, rgba(255, 255, 255, 0.72) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .slide-desc {
+      font-size: 1.05rem;
+      line-height: 1.55;
+      color: rgba(255, 255, 255, 0.7);
+    }
+    .slide-features {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.94rem;
+      color: rgba(255, 255, 255, 0.88);
+    }
+    .feature-check {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid #10b981;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #10b981;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    /* Glass Mockup Container */
+    .glass-card {
+      flex: 1;
+      height: 480px;
+      border-radius: 20px;
+      background: rgba(18, 30, 24, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(24px) saturate(160%);
+      box-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      transition: all 0.6s ease;
+    }
+
+    /* Mock Player Header */
+    .card-top {
+      height: 42px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .window-dots {
+      display: flex;
+      gap: 6px;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .dot.red { background: #ef4444; }
+    .dot.yellow { background: #f59e0b; }
+    .dot.green { background: #10b981; }
+
+    .card-body {
+      flex: 1;
+      padding: 24px;
+      display: flex;
+      gap: 24px;
+      align-items: center;
+    }
+
+    /* Album Art / Mockup visuals */
+    .album-box {
+      width: 190px;
+      height: 190px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #10b981 0%, #0284c7 50%, #6366f1 100%);
+      box-shadow: 0 12px 32px rgba(16, 185, 129, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .album-disc {
+      position: absolute;
+      width: 170px;
+      height: 170px;
+      border-radius: 50%;
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      animation: spinVinyl 16s linear infinite;
+    }
+    @keyframes spinVinyl {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .meta-box {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .track-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+    }
+    .track-artist {
+      font-size: 0.95rem;
+      color: rgba(255, 255, 255, 0.65);
+    }
+
+    /* Waveform visualizer */
+    .waveform {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      height: 48px;
+      margin: 8px 0;
+    }
+    .bar {
+      flex: 1;
+      background: #10b981;
+      border-radius: 4px;
+      height: 20%;
+      animation: wave 1.2s ease-in-out infinite alternate;
+    }
+    .bar:nth-child(2) { animation-delay: 0.15s; }
+    .bar:nth-child(3) { animation-delay: 0.3s; }
+    .bar:nth-child(4) { animation-delay: 0.45s; }
+    .bar:nth-child(5) { animation-delay: 0.2s; }
+    .bar:nth-child(6) { animation-delay: 0.5s; }
+    .bar:nth-child(7) { animation-delay: 0.1s; }
+    .bar:nth-child(8) { animation-delay: 0.35s; }
+
+    @keyframes wave {
+      0% { height: 15%; background: #10b981; }
+      100% { height: 95%; background: #06b6d4; }
+    }
+
+    /* Progress & Controls */
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.15);
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 45%;
+      background: linear-gradient(90deg, #10b981, #06b6d4);
+      border-radius: 999px;
+    }
+
+    /* Theme showcase variations */
+    .theme-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      width: 100%;
+      height: 100%;
+      padding: 16px;
+    }
+    .theme-card {
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      transition: all 0.3s ease;
+    }
+    .theme-card.aero {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: #10b981;
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+    }
+    .theme-card.vaporwave {
+      background: linear-gradient(135deg, rgba(236, 72, 153, 0.25), rgba(99, 102, 241, 0.25));
+      border-color: #ec4899;
+    }
+    .theme-card.matrix {
+      background: #021a0f;
+      border-color: #00ff66;
+      font-family: monospace;
+      color: #00ff66;
+    }
+    .theme-card.brutalist {
+      background: #ffffff;
+      color: #000000;
+      border: 3px solid #000000;
+      box-shadow: 4px 4px 0 #000000;
+    }
+    .theme-card.oled {
+      background: #000000;
+      border-color: #27272a;
+    }
+    .theme-card.amber {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: #f59e0b;
+    }
+
+    /* Auto update notification pill mockup */
+    .updater-pill-mock {
+      background: rgba(16, 185, 129, 0.16);
+      border: 1px solid #10b981;
+      border-radius: 12px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    /* Bottom progress ticker */
+    .timeline-indicator {
+      position: absolute;
+      bottom: 12px;
+      left: 40px;
+      right: 40px;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      overflow: hidden;
+      z-index: 30;
+    }
+    .timeline-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #10b981, #06b6d4, #a855f7);
+      transition: width 0.1s linear;
+    }
+  </style>
+</head>
+<body>
+  <div class="backdrop" id="backdrop"></div>
+  <div class="orb orb-1" id="orb1"></div>
+  <div class="orb orb-2" id="orb2"></div>
+
+  <div class="brand-bar">
+    <div class="brand-logo">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      </div>
+      <span>PULSE</span>
+    </div>
+    <div class="brand-badges">
+      <span class="pill glow">v1.0.3 READY</span>
+      <span class="pill">MIT OPEN SOURCE</span>
+      <span class="pill">NO SPOTIFY PREMIUM NEEDED</span>
+    </div>
+  </div>
+
+  <div class="stage">
+    <!-- SLIDE 1: INTRO -->
+    <div class="slide active" id="slide-0">
+      <div class="slide-text">
+        <div class="slide-tag">Next-Gen Audio Experience</div>
+        <div class="slide-title">Pulse: The Open-Source Glass Music Player</div>
+        <div class="slide-desc">
+          A gorgeous, non-commercial desktop and web audio client crafted with Frutiger Aero glassmorphism, fluid motion, and zero telemetry.
+        </div>
+        <div class="slide-features">
+          <div class="feature-item"><span class="feature-check">✓</span> 100% Free & Open Source (MIT)</div>
+          <div class="feature-item"><span class="feature-check">✓</span> Works For Free & Non-Spotify Users</div>
+          <div class="feature-item"><span class="feature-check">✓</span> Built-in Silent Background Auto-Updates</div>
+        </div>
+      </div>
+      <div class="glass-card">
+        <div class="card-top">
+          <div class="window-dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+          <span style="font-size:0.75rem;opacity:0.6;">Pulse // Frutiger Aero Edition</span>
+          <span style="font-size:0.75rem;color:#10b981;">● Online</span>
+        </div>
+        <div class="card-body">
+          <div class="album-box">
+            <div class="album-disc"></div>
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="#ffffff" style="opacity:0.9;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+          <div class="meta-box">
+            <div class="track-title">Solar Drift</div>
+            <div class="track-artist">Pulse Studio &bull; Ambient Sessions</div>
+            <div class="waveform">
+              <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+              <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            </div>
+            <div class="progress-bar"><div class="progress-fill"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: LOCAL MUSIC & FREE USERS -->
+    <div class="slide" id="slide-1">
+      <div class="slide-text">
+        <div class="slide-tag">Freedom For All Listeners</div>
+        <div class="slide-title">No Spotify Premium? No Problem!</div>
+        <div class="slide-desc">
+          Pulse gives you full freedom. Free Spotify accounts are fully supported with procedural synths, and you can upload your own personal local audio library.
+        </div>
+        <div class="slide-features">
+          <div class="feature-item"><span class="feature-check">✓</span> Upload local MP3, WAV, FLAC, and AAC files</div>
+          <div class="feature-item"><span class="feature-check">✓</span> Create custom offline playlists with custom art</div>
+          <div class="feature-item"><span class="feature-check">✓</span> ID3 Metadata & Album Art parsing in IndexedDB</div>
+        </div>
+      </div>
+      <div class="glass-card" style="padding: 24px; justify-content: center;">
+        <div style="border: 2px dashed rgba(16, 185, 129, 0.45); border-radius: 16px; padding: 32px; text-align: center; background: rgba(16, 185, 129, 0.05);">
+          <div style="font-size: 2.5rem; margin-bottom: 8px;">📂</div>
+          <div style="font-weight: 700; font-size: 1.15rem; margin-bottom: 6px;">Drop Your Music Files Here</div>
+          <div style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">Supports MP3, FLAC, WAV, AAC &bull; Stored locally on your machine</div>
+          <div style="margin-top: 18px; display: inline-flex; gap: 8px;">
+            <span class="pill glow">+ Create Playlist</span>
+            <span class="pill">Import Folder</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: SPOTIFY WEB API & CONNECT -->
+    <div class="slide" id="slide-2">
+      <div class="slide-text">
+        <div class="slide-tag">Pure Integration</div>
+        <div class="slide-title">Spotify Without The Bloat</div>
+        <div class="slide-desc">
+          Built on official Spotify Web API & Web Playback SDK with Bring-Your-Own Client ID. Zero client patching, zero code injection, zero account risk.
+        </div>
+        <div class="slide-features">
+          <div class="feature-item"><span class="feature-check">✓</span> Real-Time Synced Karaoke Lyrics (LRCLIB)</div>
+          <div class="feature-item"><span class="feature-check">✓</span> Spotify Connect Device Controller</div>
+          <div class="feature-item"><span class="feature-check">✓</span> PKCE OAuth & Windows Credential Vault</div>
+        </div>
+      </div>
+      <div class="glass-card" style="padding: 24px; justify-content: center;">
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div style="font-size: 0.82rem; color: #10b981; font-weight:700;">LIVE SYNCED LYRICS</div>
+          <div style="font-size: 1.1rem; opacity: 0.4;">Underneath the neon sky...</div>
+          <div style="font-size: 1.45rem; font-weight: 800; color: #34d399; text-shadow: 0 0 16px rgba(52, 211, 153, 0.5);">
+            We were dancing through the glass reflections ♪
+          </div>
+          <div style="font-size: 1.1rem; opacity: 0.4;">Lost inside the frequency forever...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 4: THEMES & CUSTOMIZATION -->
+    <div class="slide" id="slide-3">
+      <div class="slide-text">
+        <div class="slide-tag">Aesthetic Engine</div>
+        <div class="slide-title">6 Distinct Themes & Total Control</div>
+        <div class="slide-desc">
+          Shift seamlessly between Frutiger Aero glass, Vaporwave pastels, CRT green phosphors, High-contrast Neo-brutalist zines, and Pure OLED Black.
+        </div>
+        <div class="slide-features">
+          <div class="feature-item"><span class="feature-check">✓</span> Adjustable glass blur, refraction & noise layers</div>
+          <div class="feature-item"><span class="feature-check">✓</span> Bottom Bar, Side-by-Side, or Floating layouts</div>
+          <div class="feature-item"><span class="feature-check">✓</span> Spinning vinyl, 3D carousel, or borderless artwork</div>
+        </div>
+      </div>
+      <div class="glass-card">
+        <div class="theme-grid">
+          <div class="theme-card aero">
+            <span style="font-weight:700;">Frutiger Aero</span>
+            <span style="font-size:0.75rem;">Glossy Cyan Glass</span>
+          </div>
+          <div class="theme-card vaporwave">
+            <span style="font-weight:700;">Vaporwave</span>
+            <span style="font-size:0.75rem;">1984 Retro Neon</span>
+          </div>
+          <div class="theme-card matrix">
+            <span style="font-weight:700;">CRT Terminal</span>
+            <span style="font-size:0.75rem;">Phosphor Green</span>
+          </div>
+          <div class="theme-card brutalist">
+            <span style="font-weight:700;">Neo-Brutalist</span>
+            <span style="font-size:0.75rem;">High-Contrast Print</span>
+          </div>
+          <div class="theme-card oled">
+            <span style="font-weight:700;">OLED Stealth</span>
+            <span style="font-size:0.75rem;">Pure Pitch Black</span>
+          </div>
+          <div class="theme-card amber">
+            <span style="font-weight:700;">Warm Wax</span>
+            <span style="font-size:0.75rem;">33⅓ RPM Turntable</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: SILENT AUTO-UPDATES -->
+    <div class="slide" id="slide-4">
+      <div class="slide-text">
+        <div class="slide-tag">Automatic & Seamless</div>
+        <div class="slide-title">True Background Auto-Updates</div>
+        <div class="slide-desc">
+          Never manually re-download setup files again. Pulse checks GitHub Releases and automatically installs new versions silently in the background.
+        </div>
+        <div class="slide-features">
+          <div class="feature-item"><span class="feature-check">✓</span> Silent background NSIS installer execution</div>
+          <div class="feature-item"><span class="feature-check">✓</span> Preserves all offline playlists, vaults & settings</div>
+          <div class="feature-item"><span class="feature-check">✓</span> Zero annoying popups or redirects</div>
+        </div>
+      </div>
+      <div class="glass-card" style="padding: 32px; justify-content: center;">
+        <div style="font-size: 0.82rem; font-weight:700; color:#10b981;">AUTO-UPDATER ENGINE</div>
+        <div style="font-size: 1.4rem; font-weight: 800; margin-top: 4px;">Update v1.0.3 Installed Automatically</div>
+        <div class="updater-pill-mock">
+          <div style="width:28px; height:28px; border-radius:50%; background:#10b981; display:flex; align-items:center; justify-content:center; color:#08110c; font-weight:900;">✓</div>
+          <div>
+            <div style="font-weight:700; font-size:0.92rem;">Pulse is up to date on v1.0.3</div>
+            <div style="font-size:0.78rem; opacity:0.7;">Verified SHA-256 binary from GitHub Releases</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: OUTRO / CALL TO ACTION -->
+    <div class="slide" id="slide-5">
+      <div style="width:100%; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 20px;">
+        <div class="brand-icon" style="width: 64px; height: 64px; border-radius: 16px;">
+          <svg viewBox="0 0 24 24" style="width:34px; height:34px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </div>
+        <div style="font-size: 3.4rem; font-weight: 900; letter-spacing: -0.02em;">
+          Experience Pulse Today
+        </div>
+        <div style="font-size: 1.25rem; color: rgba(255,255,255,0.7); max-width: 680px;">
+          The ultimate glass audio player. Open source, non-commercial, and free forever.
+        </div>
+        <div style="display: flex; gap: 14px; margin-top: 10px;">
+          <span class="pill glow" style="font-size: 1.05rem; padding: 10px 24px;">github.com/berkayyytech/pulse</span>
+          <span class="pill" style="font-size: 1.05rem; padding: 10px 24px;">Windows (.exe) &bull; Web PWA</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-indicator">
+    <div class="timeline-bar" id="timelineBar"></div>
+  </div>
+
+  <script>
+    const DURATION_PER_SLIDE = 4600; // 4.6 seconds per slide (total ~27.6 seconds)
+    const slides = document.querySelectorAll('.slide');
+    const timelineBar = document.getElementById('timelineBar');
+    const backdrop = document.getElementById('backdrop');
+    const orb1 = document.getElementById('orb1');
+    const orb2 = document.getElementById('orb2');
+
+    const themeBackdrops = [
+      { bg: 'radial-gradient(circle at 50% 30%, #0d281e 0%, #050b08 70%)', orb1: 'rgba(16, 185, 129, 0.8)', orb2: 'rgba(56, 189, 248, 0.7)' },
+      { bg: 'radial-gradient(circle at 50% 30%, #062b33 0%, #031014 70%)', orb1: 'rgba(6, 182, 212, 0.8)', orb2: 'rgba(16, 185, 129, 0.6)' },
+      { bg: 'radial-gradient(circle at 50% 30%, #1e1b4b 0%, #08071a 70%)', orb1: 'rgba(99, 102, 241, 0.8)', orb2: 'rgba(236, 72, 153, 0.6)' },
+      { bg: 'radial-gradient(circle at 50% 30%, #2e0827 0%, #0e020c 70%)', orb1: 'rgba(236, 72, 153, 0.8)', orb2: 'rgba(245, 158, 11, 0.6)' },
+      { bg: 'radial-gradient(circle at 50% 30%, #0a2517 0%, #030d08 70%)', orb1: 'rgba(34, 197, 94, 0.8)', orb2: 'rgba(16, 185, 129, 0.6)' },
+      { bg: 'radial-gradient(circle at 50% 30%, #0f172a 0%, #020617 70%)', orb1: 'rgba(16, 185, 129, 0.8)', orb2: 'rgba(147, 51, 234, 0.7)' }
+    ];
+
+    let currentSlide = 0;
+    let startTime = null;
+    const totalDuration = slides.length * DURATION_PER_SLIDE;
+
+    window.__IS_SHOWCASE_DONE__ = false;
+
+    function renderFrame(now) {
+      if (!startTime) startTime = now;
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / totalDuration);
+      timelineBar.style.width = (progress * 100) + '%';
+
+      const nextSlide = Math.min(slides.length - 1, Math.floor(elapsed / DURATION_PER_SLIDE));
+      if (nextSlide !== currentSlide) {
+        slides[currentSlide].classList.remove('active');
+        currentSlide = nextSlide;
+        slides[currentSlide].classList.add('active');
+
+        const theme = themeBackdrops[currentSlide];
+        if (theme) {
+          backdrop.style.background = theme.bg;
+          orb1.style.background = `radial-gradient(circle, ${theme.orb1} 0%, rgba(0,0,0,0) 70%)`;
+          orb2.style.background = `radial-gradient(circle, ${theme.orb2} 0%, rgba(0,0,0,0) 70%)`;
+        }
+      }
+
+      if (elapsed < totalDuration) {
+        requestAnimationFrame(renderFrame);
+      } else {
+        window.__IS_SHOWCASE_DONE__ = true;
+      }
+    }
+
+    window.__START_SHOWCASE__ = () => {
+      startTime = null;
+      requestAnimationFrame(renderFrame);
+    };
+
+    // Auto-start on load
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        window.__START_SHOWCASE__();
+      }, 300);
+    });
+  </script>
+</body>
+</html>

@@ -23,7 +23,8 @@ export function isLocalOrCuratedTrack(track: Track | null): boolean {
     track.uri.startsWith('pulse:curated:') ||
     track.uri.startsWith('pulse:demo:') ||
     track.uri.startsWith('spotify:track:trk_') ||
-    Boolean(track.id?.startsWith('trk_'))
+    Boolean(track.id?.startsWith('trk_')) ||
+    Boolean(track.id?.startsWith('pulse-'))
   );
 }
 
@@ -62,7 +63,11 @@ export const playerController = {
     if (previousTrack && store.positionMs >= 30_000) {
       void recordListenIfEnabled(previousTrack, store.positionMs);
     }
-    if (previousTrack && previousTrack.duration_ms > 0 && store.positionMs >= previousTrack.duration_ms * 0.85) {
+    if (
+      previousTrack &&
+      previousTrack.duration_ms > 0 &&
+      store.positionMs >= previousTrack.duration_ms * 0.85
+    ) {
       useAchievementStore.getState().recordTrackCompleted();
     }
 
@@ -139,8 +144,12 @@ export const playerController = {
     }
 
     const activeDev =
-      (store.sdkReady && store.sdkDeviceId ? { id: store.sdkDeviceId, name: 'Pulse Web Player' } : null) ??
-      (store.activeDevice?.id && store.activeDevice.id !== 'pulse-local-audio' ? store.activeDevice : null) ??
+      (store.sdkReady && store.sdkDeviceId
+        ? { id: store.sdkDeviceId, name: 'Pulse Web Player' }
+        : null) ??
+      (store.activeDevice?.id && store.activeDevice.id !== 'pulse-local-audio'
+        ? store.activeDevice
+        : null) ??
       devices.find((d) => d.id !== 'pulse-local-audio' && d.is_active) ??
       devices.find((d) => d.id !== 'pulse-local-audio') ??
       null;
@@ -230,9 +239,7 @@ export const playerController = {
         await client.pause(store.activeDevice?.id ?? undefined);
         store.setPlaybackSnapshot({ isPlaying: false });
       } else {
-        await client.play(
-          store.activeDevice?.id ? { deviceId: store.activeDevice.id } : undefined,
-        );
+        await client.play(store.activeDevice?.id ? { deviceId: store.activeDevice.id } : undefined);
         store.setPlaybackSnapshot({ isPlaying: true });
       }
     } catch {
@@ -328,8 +335,7 @@ export const playerController = {
       const localList = await getCuratedAndLocalTracks();
       if (localList.length === 0) return;
       const currentIndex = localList.findIndex((t) => t.uri === store.currentTrack?.uri);
-      const prevIndex =
-        currentIndex > 0 ? currentIndex - 1 : localList.length - 1;
+      const prevIndex = currentIndex > 0 ? currentIndex - 1 : localList.length - 1;
       const prevTrack = localList[prevIndex];
       if (prevTrack) {
         await this.playTrack(prevTrack);

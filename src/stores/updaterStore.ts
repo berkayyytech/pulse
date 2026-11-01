@@ -32,7 +32,7 @@ export interface PersistedUpdaterPrefs {
 
 const DEFAULT_PREFS: PersistedUpdaterPrefs = {
   checkOnStartup: true,
-  autoInstallUpdates: false,
+  autoInstallUpdates: true,
   includePrereleases: false,
   repoSlug: DEFAULT_UPDATE_REPO,
   skippedVersion: null,
@@ -66,8 +66,7 @@ function loadUpdaterPrefs(): PersistedUpdaterPrefs {
         typeof parsed.repoSlug === 'string' && isValidGithubRepoSlug(parsed.repoSlug)
           ? parsed.repoSlug.trim()
           : DEFAULT_PREFS.repoSlug,
-      skippedVersion:
-        typeof parsed.skippedVersion === 'string' ? parsed.skippedVersion : null,
+      skippedVersion: typeof parsed.skippedVersion === 'string' ? parsed.skippedVersion : null,
       lastCheckedAtIso:
         typeof parsed.lastCheckedAtIso === 'string' ? parsed.lastCheckedAtIso : null,
     };
@@ -105,10 +104,7 @@ interface UpdaterStoreState extends PersistedUpdaterPrefs {
   skipVersion: (version: string | null) => void;
   dismissBannerForSession: () => void;
   setPwaRefreshReady: (ready: boolean) => void;
-  checkForUpdates: (options?: {
-    manual?: boolean;
-    fetchImpl?: typeof fetch;
-  }) => Promise<void>;
+  checkForUpdates: (options?: { manual?: boolean; fetchImpl?: typeof fetch }) => Promise<void>;
   installUpdateNow: (silentInstall?: boolean) => Promise<void>;
   reloadFromStorage: () => void;
 }

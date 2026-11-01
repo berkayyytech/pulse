@@ -3,7 +3,9 @@ name: Build & Publish Desktop Release (.exe)
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - '[vV]*'
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -44,7 +46,7 @@ jobs:
         run: npx tauri build
 
       - name: Upload Windows .exe & NSIS Setup to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true

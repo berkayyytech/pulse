@@ -24,13 +24,51 @@ describe('Updater Engine (GitHub Releases SemVer + .exe Auto-Install)', () => {
     });
   });
 
-  it('compares semantic version tags accurately including v-prefixes and pre-releases', () => {
+  it('compares semantic version tags accurately including v-prefixes, capital V, and pre-releases', () => {
     expect(compareSemver('v0.2.0', '0.1.0')).toBe(1);
     expect(compareSemver('0.1.0', 'v0.1.0')).toBe(0);
     expect(compareSemver('0.1.1', '0.1.2')).toBe(-1);
     expect(compareSemver('1.0.0', '1.0.0-beta.1')).toBe(1);
+    expect(compareSemver('V1.0.3_Fix', '0.1.0')).toBe(1);
+    expect(compareSemver('V1.0.3', 'V1.0.2')).toBe(1);
+    expect(compareSemver('V1', '0.1.0')).toBe(1);
     expect(isNewerSemver('0.1.0', 'v0.2.0')).toBe(true);
     expect(isNewerSemver('0.2.0', 'v0.1.9')).toBe(false);
+    expect(isNewerSemver('0.1.0', 'V1.0.3')).toBe(true);
+  });
+
+  it('synthesizes or resolves Windows installer assets if release assets array is empty', async () => {
+    const mockEmptyAssetsRelease = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          {
+            tag_name: 'V1.0.3_Fix',
+            name: 'Pulse V1.0.3 Fix',
+            body: 'Bug Fixes',
+            html_url: 'https://github.com/berkayyytech/pulse/releases/tag/V1.0.3_Fix',
+            published_at: '2026-11-01T19:56:56Z',
+            draft: false,
+            prerelease: false,
+            assets: [],
+          },
+        ]),
+        { status: 200 },
+      ),
+    );
+
+    const res = await checkForGitHubReleaseUpdate({
+      repoSlug: 'berkayyytech/pulse',
+      currentVersion: '0.1.0',
+      fetchImpl: mockEmptyAssetsRelease,
+    });
+
+    expect(res.outcome).toBe('update-available');
+    if (res.outcome === 'update-available') {
+      expect(res.release.version).toBe('1.0.3_Fix');
+      expect(res.release.windowsInstaller).not.toBeNull();
+      expect(res.release.windowsInstaller?.name).toContain('Pulse_');
+      expect(res.release.windowsInstaller?.downloadUrl).toContain('/V1.0.3_Fix/');
+    }
   });
 
   it('detects newer GitHub Releases with NSIS setup .exe assets and SHA-256 digests', async () => {

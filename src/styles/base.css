@@ -116,6 +116,23 @@ a {
   }
 }
 
+@keyframes gpSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.gp-spin {
+  animation: gpSpin 1s linear infinite;
+}
+
+.gp-spin-slow {
+  animation: gpSpin 12s linear infinite;
+}
+
 .gp-viewport {
   position: relative;
   width: 100vw;

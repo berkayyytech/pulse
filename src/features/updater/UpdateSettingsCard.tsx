@@ -66,7 +66,7 @@ export function UpdateSettingsCard() {
           </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {availableRelease && inDesktopExe && availableRelease.windowsInstaller ? (
+            {availableRelease && inDesktopExe ? (
               <button
                 type="button"
                 className="gp-action-pill"
@@ -86,7 +86,7 @@ export function UpdateSettingsCard() {
                 <Download size={14} aria-hidden="true" />
                 <span>
                   {status === 'installing'
-                    ? 'Downloading…'
+                    ? 'Downloading & Installing…'
                     : `Install v${availableRelease.version} & Restart`}
                 </span>
               </button>

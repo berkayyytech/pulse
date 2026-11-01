@@ -44,7 +44,7 @@ export function UpdateBanner() {
       return undefined;
     }
 
-    setAutoCountdownSec(6);
+    setAutoCountdownSec(3);
     const interval = setInterval(() => {
       setAutoCountdownSec((prev) => {
         if (prev === null) {
@@ -52,7 +52,7 @@ export function UpdateBanner() {
         }
         if (prev <= 1) {
           clearInterval(interval);
-          void installUpdateNow(false);
+          void installUpdateNow(true);
           return 0;
         }
         return prev - 1;
@@ -191,7 +191,7 @@ export function UpdateBanner() {
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
-        {inDesktopExe && installer ? (
+        {inDesktopExe ? (
           <button
             type="button"
             disabled={status === 'installing' || status === 'installed-restarting'}
@@ -210,15 +210,21 @@ export function UpdateBanner() {
               void installUpdateNow(false);
             }}
           >
-            <Download size={13} aria-hidden="true" />
+            {status === 'installing' ? (
+              <RefreshCw size={13} className="gp-spin" aria-hidden="true" />
+            ) : (
+              <Download size={13} aria-hidden="true" />
+            )}
             <span>
               {status === 'installing'
-                ? 'Downloading…'
+                ? 'Downloading & Installing…'
                 : status === 'installed-restarting'
                   ? 'Restarting…'
-                  : autoCountdownSec !== null && autoCountdownSec > 0
-                    ? `Auto-Updating in ${autoCountdownSec}s`
-                    : `Update & Restart${formatAssetSize(installer.sizeBytes)}`}
+                  : status === 'error'
+                    ? 'Retry Auto-Update'
+                    : autoCountdownSec !== null && autoCountdownSec > 0
+                      ? `Auto-Updating in ${autoCountdownSec}s`
+                      : `Update Now${installer ? formatAssetSize(installer.sizeBytes) : ''}`}
             </span>
           </button>
         ) : (

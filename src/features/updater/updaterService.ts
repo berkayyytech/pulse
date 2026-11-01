@@ -24,7 +24,7 @@ export function isValidGithubRepoSlug(slug: string): boolean {
 export function getBundledAppVersion(): string {
   return typeof __PULSE_APP_VERSION__ === 'string' && __PULSE_APP_VERSION__.trim()
     ? __PULSE_APP_VERSION__.trim()
-    : '0.1.0';
+    : '1.0.3';
 }
 
 export async function resolveRunningAppVersion(): Promise<string> {
@@ -50,14 +50,15 @@ interface ParsedSemver {
 
 export function parseSemverTag(raw: string): ParsedSemver | null {
   const cleaned = raw.trim().replace(/^[vV]/, '');
-  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(cleaned);
+  const match =
+    /^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:[-_]([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(cleaned);
   if (!match) {
     return null;
   }
   return {
     major: Number(match[1]),
-    minor: Number(match[2]),
-    patch: Number(match[3]),
+    minor: match[2] !== undefined ? Number(match[2]) : 0,
+    patch: match[3] !== undefined ? Number(match[3]) : 0,
     prerelease: match[4] ?? null,
   };
 }
@@ -201,27 +202,36 @@ export async function checkForGitHubReleaseUpdate(options: {
   const rawSlug = options.repoSlug.trim();
   const slug = normalizeGithubRepoSlug(rawSlug);
   if (!isValidGithubRepoSlug(slug)) {
-    throw new Error('Enter a valid GitHub repository in owner/repo format (e.g. berkayyytech/pulse).');
+    throw new Error(
+      'Enter a valid GitHub repository in owner/repo format (e.g. berkayyytech/pulse).',
+    );
   }
 
   const currentVersion = options.currentVersion ?? (await resolveRunningAppVersion());
   const fetcher = options.fetchImpl ?? fetch;
 
-  const endpoint = options.includePrereleases
-    ? `https://api.github.com/repos/${slug}/releases?per_page=8`
-    : `https://api.github.com/repos/${slug}/releases/latest`;
+  const endpoint = `https://api.github.com/repos/${slug}/releases?per_page=12`;
 
-  const response = await fetcher(endpoint, {
+  let response = await fetcher(endpoint, {
     headers: {
       Accept: 'application/vnd.github+json',
     },
   });
 
   if (response.status === 404) {
-    return {
-      outcome: 'no-releases-published',
-      currentVersion,
-    };
+    const fallbackEndpoint = `https://api.github.com/repos/${slug}/releases/latest`;
+    const fallbackRes = await fetcher(fallbackEndpoint, {
+      headers: { Accept: 'application/vnd.github+json' },
+    });
+    if (fallbackRes.status === 404) {
+      return {
+        outcome: 'no-releases-published',
+        currentVersion,
+      };
+    }
+    if (fallbackRes.ok) {
+      response = fallbackRes;
+    }
   }
 
   if (response.status === 403) {
@@ -270,19 +280,30 @@ export async function checkForGitHubReleaseUpdate(options: {
   }
 
   const rawJson: unknown = await response.json();
-  let chosenRelease: z.infer<typeof GitHubReleaseSchema> | null = null;
+  let allReleases: z.infer<typeof GitHubReleaseSchema>[] = [];
 
-  if (options.includePrereleases) {
-    const list = z.array(GitHubReleaseSchema).parse(rawJson);
-    chosenRelease =
-      list.find((r) => !r.draft && parseSemverTag(r.tag_name) !== null) ?? null;
+  if (Array.isArray(rawJson)) {
+    allReleases = z.array(GitHubReleaseSchema).parse(rawJson);
   } else {
-    const single = GitHubReleaseSchema.parse(rawJson);
-    if (!single.draft) {
-      chosenRelease = single;
-    }
+    allReleases = [GitHubReleaseSchema.parse(rawJson)];
   }
 
+  const validReleases = allReleases.filter(
+    (r) =>
+      !r.draft &&
+      (options.includePrereleases || !r.prerelease) &&
+      parseSemverTag(r.tag_name) !== null,
+  );
+
+  if (validReleases.length === 0) {
+    return {
+      outcome: 'no-releases-published',
+      currentVersion,
+    };
+  }
+
+  validReleases.sort((a, b) => compareSemver(b.tag_name, a.tag_name));
+  const chosenRelease = validReleases[0];
   if (!chosenRelease) {
     return {
       outcome: 'no-releases-published',
@@ -299,6 +320,32 @@ export async function checkForGitHubReleaseUpdate(options: {
     };
   }
 
+  let windowsInstaller = pickWindowsInstallerAsset(chosenRelease.assets);
+
+  // If the absolute latest release tag does not have an attached installer yet,
+  // check if another newer release has an uploaded installer
+  if (!windowsInstaller) {
+    for (const rel of validReleases) {
+      if (isNewerSemver(currentVersion, rel.tag_name)) {
+        const candidate = pickWindowsInstallerAsset(rel.assets);
+        if (candidate) {
+          windowsInstaller = candidate;
+          break;
+        }
+      }
+    }
+  }
+
+  // If still not found, synthesize standard GitHub release installer asset URL so auto-update can fetch it directly
+  if (!windowsInstaller) {
+    windowsInstaller = {
+      name: `Pulse_${cleanedVersion}_x64-setup.exe`,
+      downloadUrl: `https://github.com/${slug}/releases/download/${chosenRelease.tag_name}/Pulse_${cleanedVersion}_x64-setup.exe`,
+      sizeBytes: 0,
+      sha256: null,
+    };
+  }
+
   return {
     outcome: 'update-available',
     currentVersion,
@@ -310,7 +357,7 @@ export async function checkForGitHubReleaseUpdate(options: {
       htmlUrl: chosenRelease.html_url,
       publishedAtIso: chosenRelease.published_at ?? null,
       prerelease: chosenRelease.prerelease,
-      windowsInstaller: pickWindowsInstallerAsset(chosenRelease.assets),
+      windowsInstaller,
     },
   };
 }

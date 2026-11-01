@@ -142,7 +142,63 @@ export const DEMO_TRACK_3: Track = {
   type: 'track',
 };
 
+export const DEMO_TRACK_DRAKE: Track = {
+  id: 'trk_drake_01',
+  name: 'One Dance',
+  uri: 'spotify:track:1zi7xxip9CRoOb9KcQBBM7',
+  duration_ms: 173_986,
+  explicit: false,
+  disc_number: 1,
+  track_number: 12,
+  is_local: false,
+  artists: [
+    {
+      id: 'drake',
+      name: 'Drake',
+      uri: 'spotify:artist:3TVXtAsR1Inumwj472S9r4',
+      href: null,
+      external_urls: { spotify: 'https://open.spotify.com/artist/3TVXtAsR1Inumwj472S9r4' },
+    },
+    {
+      id: 'wizkid',
+      name: 'Wizkid',
+      uri: 'spotify:artist:3tVQdUvMrE001vJ1URCG7R',
+      href: null,
+      external_urls: { spotify: 'https://open.spotify.com/artist/3tVQdUvMrE001vJ1URCG7R' },
+    },
+    {
+      id: 'kyla',
+      name: 'Kyla',
+      uri: 'spotify:artist:7iZzH5h1JvG1k6Xv8zN6xM',
+      href: null,
+      external_urls: { spotify: 'https://open.spotify.com/artist/7iZzH5h1JvG1k6Xv8zN6xM' },
+    },
+  ],
+  album: {
+    id: 'alb_views',
+    name: 'Views',
+    album_type: 'album',
+    total_tracks: 20,
+    release_date: '2016-04-29',
+    release_date_precision: 'day',
+    uri: 'spotify:album:40GMAh9LJ2Kh83JKKVhYeW',
+    href: null,
+    images: [
+      {
+        url: 'https://i.scdn.co/image/ab67616d0000b2739416ed64daf84936d89e671c',
+        height: 640,
+        width: 640,
+      },
+    ],
+    artists: [],
+    external_urls: { spotify: 'https://open.spotify.com/album/40GMAh9LJ2Kh83JKKVhYeW' },
+  },
+  external_urls: { spotify: 'https://open.spotify.com/track/1zi7xxip9CRoOb9KcQBBM7' },
+  type: 'track',
+};
+
 export const DEMO_TRACKS: Track[] = [
+  DEMO_TRACK_DRAKE,
   DEMO_TRACK_1,
   DEMO_TRACK_2,
   DEMO_TRACK_3,

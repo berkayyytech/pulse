@@ -1,6 +1,6 @@
 {
   "name": "pulse-spotify-client",
-  "version": "0.1.0",
+  "version": "1.0.3",
   "private": true,
   "description": "Free, open-source, non-commercial Spotify client built on official Web API & Web Playback SDK with BYO Client ID.",
   "license": "MIT",
@@ -22,7 +22,8 @@
     "smoke:live": "node --experimental-strip-types scripts/liveSmokeTest.ts",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build",
+    "make:video": "node scripts/recordRealAppVideo.mjs"
   },
   "dependencies": {
     "@pulse/plugin-sdk": "*",

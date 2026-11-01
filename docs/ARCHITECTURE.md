@@ -1,6 +1,6 @@
 # Pulse Architecture Document
 
-> **Status:** Deliverable 1 (v0.1.0 Foundation)  
+> **Status:** Production Ready (v1.0.3 Release)  
 > **License:** MIT (Standalone repository, non-commercial, BYO Spotify Client ID)  
 > **Compliance Baseline:** Spotify Developer Policy & February/March 2026 Development Mode Web API Specification
 
@@ -338,3 +338,42 @@ To prevent accidental regressions, Pulse's `SpotifyClient` intentionally omits a
    - **WCAG 2.1 AA:** High-contrast token pairs ($\ge 4.5:1$ body text, $\ge 3:1$ controls), visible `:focus-visible` outlines, full `aria-label` / landmark semantics, and `@media (prefers-reduced-motion: reduce)` zero-animation mode.
    - **Performance:** Route-level `React.lazy`, `@tanstack/react-virtual` row virtualization, zero render-blocking scripts (`spotify-player.js` injected lazily after auth + EME probe), cold start < 2s.
    - **Privacy:** Zero telemetry, zero analytics SDKs, strictly opt-in third-party enrichment, one-click complete local wipe (`Dexie.delete` + `TokenVault.clear`).
+
+---
+
+## 7. Auto-Updater Engine & Fallback Resolver (`src/features/updater`)
+
+Pulse includes a production-grade, background-capable auto-updater designed to pull releases from GitHub without requiring users to manually visit a browser:
+
+1. **Semantic Tag Parsing (`parseSemverTag`)**:
+   - Supports variable GitHub tag formats (e.g. `v1.0.3`, `V1.0.3_Fix`, `1.0.3`, `v1`).
+   - Normalizes tags into canonical `[major, minor, patch]` tuples with robust pre-release metadata handling.
+2. **Asset Resolution & Fallback Synthesizer**:
+   - Searches GitHub release assets for Windows NSIS installers (`.exe`, `-setup.exe`) and portable executables.
+   - If a tag is published before workflow artifacts upload, Pulse synthesizes predictable release asset URLs (`Pulse_{version}_x64-setup.exe` and `Pulse.exe`).
+3. **Native Desktop Installation (`src-tauri/src/lib.rs`)**:
+   - Downloads the installer binary to `%TEMP%` or app data storage with streaming chunks.
+   - Automatically attempts secondary asset candidates (`Pulse_0.1.0_x64-setup.exe`, `Pulse.exe`) if initial asset URLs return `404`.
+   - Spawns the NSIS installer silently (`/S`) or in background mode and exits the running instance cleanly so files are replaced without file lock errors.
+
+---
+
+## 8. Offline Audio, Custom Playlists & Synced Lyrics Engine
+
+1. **Zero-Spotify Offline Mode**:
+   - **Local Audio Service (`src/features/local-audio`)**: Decodes MP3, WAV, FLAC, M4A, OGG, and AAC files directly via Web Audio API and HTML5 Audio elements.
+   - **Custom Playlist Store (`src/features/playlists`)**: Offline playlists persist in IndexedDB (`pulseDb.customPlaylists`), supporting custom artwork generation, metadata editing, reordering, and instantaneous playback.
+   - **Curated Out-of-the-Box Catalog**: Curated tracks (including Drake's *"One Dance"* and ambient tape loops) are available out of the box with zero Spotify authentication required.
+2. **Privacy-Preserving Synced Lyrics (`src/features/lyrics`)**:
+   - Connects to LRCLIB (`https://lrclib.net/api/get`) with strictly opt-in settings (`pulse.privacy.externalSources`).
+   - Parses synchronized `.lrc` timestamps and delivers 60fps scrolling lyrics synchronized with player progress.
+   - Zero transmission of Spotify tokens or user identities.
+
+---
+
+## 9. Real Software Video Recording Engine (`scripts/recordRealAppVideo.mjs`)
+
+Pulse includes an automated screen capture pipeline for creating promotional videos and feature showcases:
+- **Playwright Headless Chromium**: Renders the actual software runtime at `1280x720 60fps`.
+- **Virtual Cursor & Overlay Engine**: Injects a glowing SVG cursor that animates naturally between interactive elements, clicks tabs, inputs search text, and toggles theme presets.
+- **Audio Synthesizer & FFmpeg Compilation**: Synthesizes a tempo-synced (104 BPM dancehall/synth) stereo soundtrack matching Drake's *"One Dance"* and encodes production-ready MP4 (`libx264`/`aac`) and animated GIF previews.
