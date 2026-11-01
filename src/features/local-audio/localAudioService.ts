@@ -59,279 +59,9 @@ function escapeXml(unsafe: string): string {
  * Curated Creative Commons & Royalty-Free open audio tracks.
  * Plays out-of-the-box for any user with zero Spotify account!
  */
-export const CURATED_OPEN_TRACKS: readonly Track[] = [
-  {
-    id: 'pulse-drake-one-dance',
-    name: 'One Dance',
-    uri: 'spotify:track:1zi7xxip9CRoOb9KcQBBM7',
-    duration_ms: 173_986,
-    explicit: false,
-    disc_number: 1,
-    track_number: 12,
-    is_local: false,
-    artists: [
-      {
-        id: 'drake',
-        name: 'Drake',
-        uri: 'spotify:artist:3TVXtAsR1Inumwj472S9r4',
-        href: null,
-        external_urls: { spotify: 'https://open.spotify.com/artist/3TVXtAsR1Inumwj472S9r4' },
-      },
-      {
-        id: 'wizkid',
-        name: 'Wizkid',
-        uri: 'spotify:artist:3tVQdUvMrE001vJ1URCG7R',
-        href: null,
-        external_urls: {},
-      },
-      {
-        id: 'kyla',
-        name: 'Kyla',
-        uri: 'spotify:artist:7iZzH5h1JvG1k6Xv8zN6xM',
-        href: null,
-        external_urls: {},
-      },
-    ],
-    album: {
-      id: 'alb_views',
-      name: 'Views',
-      album_type: 'album',
-      total_tracks: 20,
-      release_date: '2016-04-29',
-      release_date_precision: 'day',
-      uri: 'spotify:album:40GMAh9LJ2Kh83JKKVhYeW',
-      href: null,
-      images: [
-        {
-          url: 'https://i.scdn.co/image/ab67616d0000b2739416ed64daf84936d89e671c',
-          height: 640,
-          width: 640,
-        },
-      ],
-      artists: [],
-      external_urls: { spotify: 'https://open.spotify.com/album/40GMAh9LJ2Kh83JKKVhYeW' },
-    },
-    external_urls: { spotify: 'https://open.spotify.com/track/1zi7xxip9CRoOb9KcQBBM7' },
-    type: 'track',
-  },
-  {
-    id: 'pulse-curated-1',
-    name: 'Midnight Rainfall (Lo-Fi Chill)',
-    uri: 'pulse:curated:midnight-rainfall',
-    duration_ms: 195_000,
-    explicit: false,
-    disc_number: 1,
-    track_number: 1,
-    is_local: true,
-    artists: [
-      {
-        id: 'curated-artist-1',
-        name: 'Aether Cloud',
-        uri: 'pulse:artist:aether-cloud',
-        href: null,
-        external_urls: {},
-      },
-    ],
-    album: {
-      id: 'curated-album-1',
-      name: 'Sleep & Study Vol. 1',
-      album_type: 'album',
-      total_tracks: 5,
-      release_date: '2026-01-01',
-      release_date_precision: 'day',
-      uri: 'pulse:album:sleep-and-study',
-      href: null,
-      images: [
-        {
-          url: generateGlassCoverSvg('Midnight Rainfall', 'Aether Cloud'),
-          height: 400,
-          width: 400,
-        },
-      ],
-      artists: [],
-      external_urls: {},
-    },
-    external_urls: {},
-    type: 'track',
-  },
-  {
-    id: 'pulse-curated-2',
-    name: 'Cyber Neon Horizon',
-    uri: 'pulse:curated:cyber-neon-horizon',
-    duration_ms: 228_000,
-    explicit: false,
-    disc_number: 1,
-    track_number: 2,
-    is_local: true,
-    artists: [
-      {
-        id: 'curated-artist-2',
-        name: 'Vector Drift',
-        uri: 'pulse:artist:vector-drift',
-        href: null,
-        external_urls: {},
-      },
-    ],
-    album: {
-      id: 'curated-album-2',
-      name: 'Retrofuturism 2088',
-      album_type: 'album',
-      total_tracks: 8,
-      release_date: '2026-02-14',
-      release_date_precision: 'day',
-      uri: 'pulse:album:retrofuturism-2088',
-      href: null,
-      images: [
-        {
-          url: generateGlassCoverSvg('Cyber Neon Horizon', 'Vector Drift'),
-          height: 400,
-          width: 400,
-        },
-      ],
-      artists: [],
-      external_urls: {},
-    },
-    external_urls: {},
-    type: 'track',
-  },
-  {
-    id: 'pulse-curated-3',
-    name: 'Deep Focus Ambient Flow',
-    uri: 'pulse:curated:deep-focus-flow',
-    duration_ms: 310_000,
-    explicit: false,
-    disc_number: 1,
-    track_number: 3,
-    is_local: true,
-    artists: [
-      {
-        id: 'curated-artist-3',
-        name: 'Solace Waves',
-        uri: 'pulse:artist:solace-waves',
-        href: null,
-        external_urls: {},
-      },
-    ],
-    album: {
-      id: 'curated-album-3',
-      name: 'Theta State Reflections',
-      album_type: 'album',
-      total_tracks: 6,
-      release_date: '2026-03-01',
-      release_date_precision: 'day',
-      uri: 'pulse:album:theta-state',
-      href: null,
-      images: [
-        {
-          url: generateGlassCoverSvg('Deep Focus Ambient Flow', 'Solace Waves'),
-          height: 400,
-          width: 400,
-        },
-      ],
-      artists: [],
-      external_urls: {},
-    },
-    external_urls: {},
-    type: 'track',
-  },
-  {
-    id: 'pulse-curated-4',
-    name: 'Starlight Memories (Acoustic Chill)',
-    uri: 'pulse:curated:starlight-memories',
-    duration_ms: 184_000,
-    explicit: false,
-    disc_number: 1,
-    track_number: 4,
-    is_local: true,
-    artists: [
-      {
-        id: 'curated-artist-4',
-        name: 'Luna Grove',
-        uri: 'pulse:artist:luna-grove',
-        href: null,
-        external_urls: {},
-      },
-    ],
-    album: {
-      id: 'curated-album-4',
-      name: 'Quiet Nights by the Coast',
-      album_type: 'album',
-      total_tracks: 4,
-      release_date: '2026-03-20',
-      release_date_precision: 'day',
-      uri: 'pulse:album:quiet-nights',
-      href: null,
-      images: [
-        {
-          url: generateGlassCoverSvg('Starlight Memories', 'Luna Grove'),
-          height: 400,
-          width: 400,
-        },
-      ],
-      artists: [],
-      external_urls: {},
-    },
-    external_urls: {},
-    type: 'track',
-  },
-  {
-    id: 'pulse-curated-5',
-    name: 'Cosmic Horizon (Dreamwave)',
-    uri: 'pulse:curated:cosmic-horizon',
-    duration_ms: 242_000,
-    explicit: false,
-    disc_number: 1,
-    track_number: 5,
-    is_local: true,
-    artists: [
-      {
-        id: 'curated-artist-5',
-        name: 'Prism Nova',
-        uri: 'pulse:artist:prism-nova',
-        href: null,
-        external_urls: {},
-      },
-    ],
-    album: {
-      id: 'curated-album-5',
-      name: 'Stardust Symphony',
-      album_type: 'album',
-      total_tracks: 7,
-      release_date: '2026-04-10',
-      release_date_precision: 'day',
-      uri: 'pulse:album:stardust-symphony',
-      href: null,
-      images: [
-        {
-          url: generateGlassCoverSvg('Cosmic Horizon', 'Prism Nova'),
-          height: 400,
-          width: 400,
-        },
-      ],
-      artists: [],
-      external_urls: {},
-    },
-    external_urls: {},
-    type: 'track',
-  },
-];
+export const CURATED_OPEN_TRACKS: readonly Track[] = [];
 
-/**
- * Public Creative Commons audio stream endpoints for curated tracks.
- * Uses high-uptime open audio streams with graceful procedural synth fallback.
- */
-export const CURATED_AUDIO_URLS: Record<string, string> = {
-  'pulse:curated:midnight-rainfall':
-    'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3',
-  'pulse:curated:cyber-neon-horizon':
-    'https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3?filename=synthwave-80s-110045.mp3',
-  'pulse:curated:deep-focus-flow':
-    'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3?filename=ambient-piano-amp-strings-10711.mp3',
-  'pulse:curated:starlight-memories':
-    'https://cdn.pixabay.com/download/audio/2022/10/14/audio_9939f792cb.mp3?filename=acoustic-guitars-ambient-chill-123278.mp3',
-  'pulse:curated:cosmic-horizon':
-    'https://cdn.pixabay.com/download/audio/2023/07/28/audio_24e055f26e.mp3?filename=dreamy-ambient-159670.mp3',
-};
+export const CURATED_AUDIO_URLS: Record<string, string> = {};
 
 export function localTrackRecordToCatalogTrack(record: LocalTrackRecord): Track {
   const coverUrl = record.coverUrl || generateGlassCoverSvg(record.title, record.artist);
@@ -462,8 +192,7 @@ export async function getLocalTracks(): Promise<Track[]> {
 }
 
 export async function getCuratedAndLocalTracks(): Promise<Track[]> {
-  const localTracks = await getLocalTracks();
-  return [...localTracks, ...CURATED_OPEN_TRACKS];
+  return getLocalTracks();
 }
 
 export async function deleteLocalTrack(id: string): Promise<void> {
@@ -482,9 +211,13 @@ export async function getAudioUrlForLocalTrack(trackId: string): Promise<string 
   }
   const record = await pulseDb.localTracks.get(trackId);
   if (record?.audioBlob) {
-    const url = URL.createObjectURL(record.audioBlob);
-    objectUrlCache.set(trackId, url);
-    return url;
+    try {
+      const url = URL.createObjectURL(record.audioBlob);
+      objectUrlCache.set(trackId, url);
+      return url;
+    } catch {
+      return null;
+    }
   }
   return null;
 }

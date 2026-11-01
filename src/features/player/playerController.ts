@@ -2,11 +2,7 @@ import { getSpotifyClient } from '@/api/clientInstance';
 import type { Track } from '@/api/schemas/catalog';
 import type { ConnectDevice } from '@/api/schemas/player';
 import type { RepeatMode } from '@/api/spotifyClient';
-import {
-  CURATED_AUDIO_URLS,
-  getAudioUrlForLocalTrack,
-  getCuratedAndLocalTracks,
-} from '@/features/local-audio/localAudioService';
+import { getAudioUrlForLocalTrack, getLocalTracks } from '@/features/local-audio/localAudioService';
 import { recordListenIfEnabled } from '@/features/stats/historyService';
 import { useAchievementStore } from '@/stores/achievementStore';
 import { useCapabilityStore } from '@/stores/capabilityStore';
@@ -15,23 +11,33 @@ import { useQueueStore } from '@/stores/queueStore';
 import { htmlAudioEngine } from './htmlAudioEngine';
 import { getActiveSdkPlayer } from './webPlaybackSdk';
 
+/**
+ * Returns true if a track is a local or offline track that should be played
+ * by the HTML audio engine instead of Spotify Connect/SDK.
+ * All genuine Spotify tracks (spotify:track:*) ALWAYS return false.
+ */
 export function isLocalOrCuratedTrack(track: Track | null): boolean {
   if (!track) return false;
+  if (track.uri.startsWith('spotify:track:') || track.uri.startsWith('spotify:episode:')) {
+    return false;
+  }
   return (
-    track.is_local ||
     track.uri.startsWith('pulse:local:') ||
     track.uri.startsWith('pulse:curated:') ||
     track.uri.startsWith('pulse:demo:') ||
-    track.uri.startsWith('spotify:track:trk_') ||
-    Boolean(track.id?.startsWith('trk_')) ||
-    Boolean(track.id?.startsWith('pulse-'))
+    Boolean(track.is_local)
   );
 }
 
 export const playerController = {
   async refreshPlaybackState(): Promise<void> {
     const store = usePlayerStore.getState();
-    if (store.engine === 'html-audio' && isLocalOrCuratedTrack(store.currentTrack)) {
+    // Do not overwrite active local audio playback with Spotify polling
+    if (
+      store.engine === 'html-audio' &&
+      isLocalOrCuratedTrack(store.currentTrack) &&
+      store.isPlaying
+    ) {
       return;
     }
 
@@ -43,7 +49,9 @@ export const playerController = {
 
     store.setAvailableDevices(devices);
 
-    if (playback) {
+    if (playback && playback.item) {
+      const activeDev = playback.device ?? null;
+      store.setEngine(activeDev?.id === store.sdkDeviceId ? 'sdk' : 'connect-remote');
       store.setPlaybackSnapshot({
         currentTrack: playback.item,
         isPlaying: playback.is_playing,
@@ -51,7 +59,7 @@ export const playerController = {
         volumePercent: playback.device?.volume_percent ?? store.volumePercent,
         shuffle: playback.shuffle_state,
         repeatMode: playback.repeat_state,
-        activeDevice: playback.device ?? null,
+        activeDevice: activeDev,
       });
     }
   },
@@ -74,7 +82,6 @@ export const playerController = {
     // Always immediately update currentTrack so the UI reflects the user's selected song instantly
     store.setPlaybackSnapshot({
       currentTrack: track,
-      isPlaying: true,
       positionMs: 0,
     });
 
@@ -84,57 +91,57 @@ export const playerController = {
       durationMs: track.duration_ms,
     });
 
-    // Branch 1: Local Audio or Curated Open Audio track
+    // ==========================================
+    // CASE A: LOCAL AUDIO TRACK (pulse:local:*)
+    // ==========================================
     if (isLocalOrCuratedTrack(track)) {
-      store.setEngine('html-audio');
-
-      // Stop any active Spotify SDK playback
+      // Pause any active Spotify SDK playback
       const sdk = getActiveSdkPlayer();
-      if (sdk && store.sdkReady) {
+      if (sdk && store.sdkReady && typeof sdk.pause === 'function') {
         try {
-          await sdk.togglePlay();
-        } catch {
-          // ignore
-        }
+          await sdk.pause();
+        } catch {}
+      } else if (store.activeDevice?.id && store.activeDevice.id !== 'pulse-local-audio') {
+        getSpotifyClient()
+          .pause(store.activeDevice.id)
+          .catch(() => undefined);
       }
 
-      if (track.uri.startsWith('pulse:curated:')) {
-        const streamUrl = CURATED_AUDIO_URLS[track.uri];
-        if (streamUrl) {
-          await htmlAudioEngine.playUrl(streamUrl, 0);
-        } else {
-          htmlAudioEngine.playProcedural();
-        }
-      } else if (track.uri.startsWith('pulse:local:')) {
-        const trackId = track.id ?? track.uri.replace('pulse:local:', '');
-        const blobUrl = await getAudioUrlForLocalTrack(trackId);
-        if (blobUrl) {
-          await htmlAudioEngine.playUrl(blobUrl, 0);
-        } else {
-          htmlAudioEngine.playProcedural();
-        }
-      } else {
-        htmlAudioEngine.playProcedural();
-      }
-      return;
-    }
-
-    // Branch 2: User explicitly selected Pulse Local Audio Player in DevicePicker
-    if (store.engine === 'html-audio' || store.activeDevice?.id === 'pulse-local-audio') {
       store.setEngine('html-audio');
-      if (track.preview_url) {
-        await htmlAudioEngine.playUrl(track.preview_url, 0);
+      store.setPlaybackSnapshot({
+        activeDevice: {
+          id: 'pulse-local-audio',
+          name: 'Pulse Local Audio Player',
+          type: 'Computer',
+          is_active: true,
+          is_private_session: false,
+          is_restricted: false,
+          volume_percent: store.volumePercent,
+          supports_volume: true,
+        },
+        isPlaying: true,
+      });
+
+      const trackId = track.id ?? track.uri.replace('pulse:local:', '');
+      const blobUrl = await getAudioUrlForLocalTrack(trackId);
+      if (blobUrl) {
+        await htmlAudioEngine.playUrl(blobUrl, 0);
       } else {
-        htmlAudioEngine.playProcedural();
+        htmlAudioEngine.stop();
+        store.setPlaybackSnapshot({ isPlaying: false });
       }
       return;
     }
 
-    // Branch 3: Spotify Track Playback (Spotify Connect or Web Playback SDK)
+    // ==========================================
+    // CASE B: REAL SPOTIFY TRACK (spotify:track:*)
+    // ==========================================
+    // 1. Immediately STOP the HTML audio engine so local sound never leaks or overlaps
     htmlAudioEngine.stop();
+
     const client = getSpotifyClient();
 
-    // Query currently available devices from Spotify API
+    // 2. Query available Spotify devices
     let devices = store.availableDevices;
     try {
       devices = await client.getAvailableDevices();
@@ -143,22 +150,34 @@ export const playerController = {
       // Ignore network failure when discovering devices
     }
 
+    const spotifyDevices = devices.filter((d) => d.id !== 'pulse-local-audio');
+
+    // 3. Find target device (Pulse SDK, active device, or first available Spotify device)
     const activeDev =
       (store.sdkReady && store.sdkDeviceId
-        ? { id: store.sdkDeviceId, name: 'Pulse Web Player' }
+        ? {
+            id: store.sdkDeviceId,
+            name: 'Pulse Web Player',
+            is_active: true,
+            type: 'Computer',
+            is_private_session: false,
+            is_restricted: false,
+            volume_percent: store.volumePercent,
+            supports_volume: true,
+          }
         : null) ??
       (store.activeDevice?.id && store.activeDevice.id !== 'pulse-local-audio'
         ? store.activeDevice
         : null) ??
-      devices.find((d) => d.id !== 'pulse-local-audio' && d.is_active) ??
-      devices.find((d) => d.id !== 'pulse-local-audio') ??
+      spotifyDevices.find((d) => d.is_active) ??
+      spotifyDevices[0] ??
       null;
 
     let playedSuccessfully = false;
 
     if (activeDev?.id) {
       try {
-        if (contextUri) {
+        if (contextUri && !contextUri.startsWith('pulse:')) {
           await client.play({
             deviceId: activeDev.id,
             contextUri,
@@ -170,10 +189,12 @@ export const playerController = {
             uris: [track.uri],
           });
         }
-        store.setEngine(activeDev.id === store.sdkDeviceId ? 'sdk' : 'connect-remote');
+        const engine = activeDev.id === store.sdkDeviceId ? 'sdk' : 'connect-remote';
+        store.setEngine(engine);
         store.setPlaybackSnapshot({
           activeDevice: activeDev as ConnectDevice,
           isPlaying: true,
+          currentTrack: track,
         });
         playedSuccessfully = true;
       } catch (err) {
@@ -181,21 +202,19 @@ export const playerController = {
       }
     }
 
-    // If Spotify Connect couldn't play (e.g. no active Spotify player open, 404, or 403)
     if (!playedSuccessfully) {
-      // Fallback: play preview MP3 or ambient procedural audio in-app so user has sound
-      store.setEngine('html-audio');
-      if (track.preview_url) {
-        await htmlAudioEngine.playUrl(track.preview_url, 0);
-      } else {
-        htmlAudioEngine.playProcedural();
-      }
+      // Do NOT play procedural synth audio when the user is trying to listen to Spotify!
+      store.setEngine('connect-remote');
+      store.setPlaybackSnapshot({
+        isPlaying: false,
+        currentTrack: track,
+      });
 
       useCapabilityStore.getState().pushAlert({
         id: 'no-active-device-fallback',
         kind: '403-degraded',
         message:
-          'No active Spotify Connect player was detected. Playing preview in Pulse. Open Spotify on your desktop or phone to control full playback!',
+          'No active Spotify Connect player was detected. Please open Spotify on your phone, desktop app, or web browser so Pulse can stream to it!',
       });
     }
   },
@@ -210,22 +229,27 @@ export const playerController = {
         await this.playTrack(queuedLocal);
         return;
       }
-      const localList = await getCuratedAndLocalTracks();
+      const localList = await getLocalTracks();
       const first = localList[0];
       if (first) {
         await this.playTrack(first);
-        return;
-      }
-    }
-
-    if (store.engine === 'html-audio' || isLocalOrCuratedTrack(store.currentTrack)) {
-      if (store.isPlaying) {
-        htmlAudioEngine.pause();
-      } else {
-        await htmlAudioEngine.resume();
       }
       return;
     }
+
+    if (isLocalOrCuratedTrack(store.currentTrack)) {
+      if (store.isPlaying) {
+        htmlAudioEngine.pause();
+        store.setPlaybackSnapshot({ isPlaying: false });
+      } else {
+        await htmlAudioEngine.resume();
+        store.setPlaybackSnapshot({ isPlaying: true });
+      }
+      return;
+    }
+
+    // Real Spotify track
+    htmlAudioEngine.stop();
 
     const sdk = getActiveSdkPlayer();
     if (store.engine === 'sdk' && sdk && store.sdkReady) {
@@ -234,23 +258,21 @@ export const playerController = {
     }
 
     const client = getSpotifyClient();
+    const deviceId =
+      store.activeDevice?.id && store.activeDevice.id !== 'pulse-local-audio'
+        ? store.activeDevice.id
+        : undefined;
+
     try {
       if (store.isPlaying) {
-        await client.pause(store.activeDevice?.id ?? undefined);
+        await client.pause(deviceId);
         store.setPlaybackSnapshot({ isPlaying: false });
       } else {
-        await client.play(store.activeDevice?.id ? { deviceId: store.activeDevice.id } : undefined);
+        await client.play(deviceId ? { deviceId } : undefined);
         store.setPlaybackSnapshot({ isPlaying: true });
       }
-    } catch {
-      // Fall back smoothly to htmlAudioEngine if Spotify remote call failed
-      if (store.isPlaying) {
-        htmlAudioEngine.pause();
-        store.setPlaybackSnapshot({ isPlaying: false });
-      } else {
-        await htmlAudioEngine.resume();
-        store.setPlaybackSnapshot({ isPlaying: true });
-      }
+    } catch (err) {
+      console.warn('Spotify play/pause toggle failed:', err);
     }
   },
 
@@ -268,7 +290,7 @@ export const playerController = {
     }
 
     if (!store.currentTrack) {
-      const localList = await getCuratedAndLocalTracks();
+      const localList = await getLocalTracks();
       const first = localList[0];
       if (first) {
         await this.playTrack(first);
@@ -276,8 +298,8 @@ export const playerController = {
       return;
     }
 
-    if (store.engine === 'html-audio' || isLocalOrCuratedTrack(store.currentTrack)) {
-      const localList = await getCuratedAndLocalTracks();
+    if (isLocalOrCuratedTrack(store.currentTrack)) {
+      const localList = await getLocalTracks();
       if (localList.length === 0) return;
 
       if (store.repeatMode === 'track') {
@@ -303,6 +325,8 @@ export const playerController = {
       return;
     }
 
+    // Real Spotify track
+    htmlAudioEngine.stop();
     const sdk = getActiveSdkPlayer();
     if (store.engine === 'sdk' && sdk && store.sdkReady) {
       await sdk.nextTrack();
@@ -310,7 +334,11 @@ export const playerController = {
     }
 
     const client = getSpotifyClient();
-    await client.skipNext(store.activeDevice?.id ?? undefined);
+    const deviceId =
+      store.activeDevice?.id && store.activeDevice.id !== 'pulse-local-audio'
+        ? store.activeDevice.id
+        : undefined;
+    await client.skipNext(deviceId);
     await this.refreshPlaybackState();
   },
 
@@ -319,7 +347,7 @@ export const playerController = {
     const store = usePlayerStore.getState();
 
     if (!store.currentTrack) {
-      const localList = await getCuratedAndLocalTracks();
+      const localList = await getLocalTracks();
       const first = localList[0];
       if (first) {
         await this.playTrack(first);
@@ -327,12 +355,12 @@ export const playerController = {
       return;
     }
 
-    if (store.engine === 'html-audio' || isLocalOrCuratedTrack(store.currentTrack)) {
+    if (isLocalOrCuratedTrack(store.currentTrack)) {
       if (store.positionMs > 3000) {
         await this.seekTo(0);
         return;
       }
-      const localList = await getCuratedAndLocalTracks();
+      const localList = await getLocalTracks();
       if (localList.length === 0) return;
       const currentIndex = localList.findIndex((t) => t.uri === store.currentTrack?.uri);
       const prevIndex = currentIndex > 0 ? currentIndex - 1 : localList.length - 1;
@@ -343,6 +371,8 @@ export const playerController = {
       return;
     }
 
+    // Real Spotify track
+    htmlAudioEngine.stop();
     const sdk = getActiveSdkPlayer();
     if (store.engine === 'sdk' && sdk && store.sdkReady) {
       await sdk.previousTrack();
@@ -350,7 +380,11 @@ export const playerController = {
     }
 
     const client = getSpotifyClient();
-    await client.skipPrevious(store.activeDevice?.id ?? undefined);
+    const deviceId =
+      store.activeDevice?.id && store.activeDevice.id !== 'pulse-local-audio'
+        ? store.activeDevice.id
+        : undefined;
+    await client.skipPrevious(deviceId);
     await this.refreshPlaybackState();
   },
 
@@ -360,11 +394,12 @@ export const playerController = {
     const clamped = Math.max(0, positionMs);
     store.setPlaybackSnapshot({ positionMs: clamped });
 
-    if (store.engine === 'html-audio' || isLocalOrCuratedTrack(store.currentTrack)) {
+    if (isLocalOrCuratedTrack(store.currentTrack)) {
       htmlAudioEngine.seek(clamped);
       return;
     }
 
+    htmlAudioEngine.stop();
     const sdk = getActiveSdkPlayer();
     if (store.engine === 'sdk' && sdk && store.sdkReady) {
       await sdk.seek(clamped);
@@ -372,7 +407,11 @@ export const playerController = {
     }
 
     const client = getSpotifyClient();
-    await client.seek(clamped, store.activeDevice?.id ?? undefined);
+    const deviceId =
+      store.activeDevice?.id && store.activeDevice.id !== 'pulse-local-audio'
+        ? store.activeDevice.id
+        : undefined;
+    await client.seek(clamped, deviceId);
   },
 
   async setVolume(volumePercent: number): Promise<void> {
@@ -381,9 +420,8 @@ export const playerController = {
     const store = usePlayerStore.getState();
     store.setPlaybackSnapshot({ volumePercent: clamped });
 
-    if (store.engine === 'html-audio') {
+    if (isLocalOrCuratedTrack(store.currentTrack) || store.engine === 'html-audio') {
       htmlAudioEngine.setVolume(clamped / 100);
-      return;
     }
 
     const sdk = getActiveSdkPlayer();
@@ -392,8 +430,10 @@ export const playerController = {
       return;
     }
 
-    const client = getSpotifyClient();
-    await client.setVolume(clamped, store.activeDevice?.id ?? undefined);
+    if (store.activeDevice?.id && store.activeDevice.id !== 'pulse-local-audio') {
+      const client = getSpotifyClient();
+      await client.setVolume(clamped, store.activeDevice.id).catch(() => undefined);
+    }
   },
 
   async toggleShuffle(): Promise<void> {
@@ -403,7 +443,11 @@ export const playerController = {
     store.setPlaybackSnapshot({ shuffle: nextState });
 
     if (store.engine !== 'html-audio' && !isLocalOrCuratedTrack(store.currentTrack)) {
-      await getSpotifyClient().setShuffle(nextState, store.activeDevice?.id ?? undefined);
+      const deviceId =
+        store.activeDevice?.id && store.activeDevice.id !== 'pulse-local-audio'
+          ? store.activeDevice.id
+          : undefined;
+      await getSpotifyClient().setShuffle(nextState, deviceId);
     }
   },
 
@@ -416,7 +460,11 @@ export const playerController = {
     store.setPlaybackSnapshot({ repeatMode: nextMode });
 
     if (store.engine !== 'html-audio' && !isLocalOrCuratedTrack(store.currentTrack)) {
-      await getSpotifyClient().setRepeatMode(nextMode, store.activeDevice?.id ?? undefined);
+      const deviceId =
+        store.activeDevice?.id && store.activeDevice.id !== 'pulse-local-audio'
+          ? store.activeDevice.id
+          : undefined;
+      await getSpotifyClient().setRepeatMode(nextMode, deviceId);
     }
   },
 

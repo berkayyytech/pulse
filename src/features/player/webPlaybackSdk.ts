@@ -31,6 +31,8 @@ export interface SpotifyWebPlayerInstance {
   connect(): Promise<boolean>;
   disconnect(): void;
   togglePlay(): Promise<void>;
+  pause?(): Promise<void>;
+  resume?(): Promise<void>;
   nextTrack(): Promise<void>;
   previousTrack(): Promise<void>;
   seek(posMs: number): Promise<void>;
@@ -53,7 +55,7 @@ let sdkPlayer: SpotifyWebPlayerInstance | null = null;
 let sdkLoadPromise: Promise<SpotifyWebPlayerInstance | null> | null = null;
 
 function mapSdkTrack(sdkTrack: SpotifySdkTrack, durationMs: number): Track {
-  const trackId = sdkTrack.id ?? (sdkTrack.uri.split(':')[2] ?? null);
+  const trackId = sdkTrack.id ?? sdkTrack.uri.split(':')[2] ?? null;
   return {
     id: trackId,
     name: sdkTrack.name,

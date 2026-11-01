@@ -4,7 +4,6 @@ import { getSpotifyClient } from '@/api/clientInstance';
 import type { FullAlbum, FullArtist, SimplifiedAlbum, Track } from '@/api/schemas/catalog';
 import type { FullPlaylist, SimplifiedPlaylist } from '@/api/schemas/playlist';
 import {
-  CURATED_OPEN_TRACKS,
   getCuratedAndLocalTracks,
   importAudioFiles,
 } from '@/features/local-audio/localAudioService';
@@ -18,7 +17,10 @@ import {
   removeTrackFromCustomPlaylist,
   resolveCustomPlaylistTracks,
 } from '@/features/playlists/customPlaylistService';
-import { fetchOptInArtistEnrichment, type ExternalArtistMetadata } from '@/features/lyrics/externalMetadataService';
+import {
+  fetchOptInArtistEnrichment,
+  type ExternalArtistMetadata,
+} from '@/features/lyrics/externalMetadataService';
 import { useAchievementStore } from '@/stores/achievementStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
@@ -44,7 +46,7 @@ export default function LibraryView() {
   const [playlists, setPlaylists] = useState<SimplifiedPlaylist[]>([]);
   const [activePlaylist, setActivePlaylist] = useState<FullPlaylist | null>(null);
   const [savedTracks, setSavedTracks] = useState<Track[]>([]);
-  const [localTracks, setLocalTracks] = useState<Track[]>(() => [...CURATED_OPEN_TRACKS]);
+  const [localTracks, setLocalTracks] = useState<Track[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [savedAlbums, setSavedAlbums] = useState<FullAlbum[]>([]);
@@ -65,7 +67,7 @@ export default function LibraryView() {
       const items = await getCuratedAndLocalTracks();
       setLocalTracks(items);
     } catch {
-      setLocalTracks([...CURATED_OPEN_TRACKS]);
+      setLocalTracks([]);
     }
   }, []);
 
@@ -177,7 +179,9 @@ export default function LibraryView() {
           <ArrowLeft size={15} />
           <span>Back to Library</span>
         </button>
-        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', marginBottom: '1.25rem' }}>
+        <div
+          style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', marginBottom: '1.25rem' }}
+        >
           {albumDetail.images[0] ? (
             <img
               src={albumDetail.images[0].url}
@@ -378,7 +382,11 @@ export default function LibraryView() {
           Your Library
         </h1>
 
-        <div role="tablist" aria-label="Library sections" style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+        <div
+          role="tablist"
+          aria-label="Library sections"
+          style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}
+        >
           {(
             [
               ['local', `Local Audio (${localTracks.length})`],
@@ -409,15 +417,23 @@ export default function LibraryView() {
 
       {!isConnected && tab !== 'local' && tab !== 'playlists' ? (
         <article className="pulse-card" style={{ marginBottom: '1.25rem' }}>
-          <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem' }}>Spotify Account Not Connected</h2>
+          <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem' }}>
+            Spotify Account Not Connected
+          </h2>
           <p style={{ color: 'var(--pulse-color-text-secondary)', margin: '0 0 1rem' }}>
-            To view your Spotify playlists, liked tracks, albums, and artists, connect your Spotify account in Setup. You can also listen to your own local audio files and royalty-free music anytime!
+            To view your Spotify playlists, liked tracks, albums, and artists, connect your Spotify
+            account in Setup. You can also listen to your own local audio files and royalty-free
+            music anytime!
           </p>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button
               type="button"
               className="pulse-nav-btn"
-              style={{ width: 'auto', background: 'var(--pulse-color-accent)', color: 'var(--pulse-color-text-inverse)' }}
+              style={{
+                width: 'auto',
+                background: 'var(--pulse-color-accent)',
+                color: 'var(--pulse-color-text-inverse)',
+              }}
               onClick={() => {
                 setTab('local');
               }}
@@ -471,12 +487,21 @@ export default function LibraryView() {
             }}
           >
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
+              >
                 <Disc3 size={18} color="var(--pulse-color-accent)" />
                 <span>Drag & Drop Audio Files Here</span>
               </div>
-              <p style={{ margin: '0.25rem 0 0', color: 'var(--pulse-color-text-secondary)', fontSize: '0.86rem' }}>
-                Supports MP3, WAV, FLAC, OGG, M4A, AAC, and WEBM. Stored safely in your local desktop database.
+              <p
+                style={{
+                  margin: '0.25rem 0 0',
+                  color: 'var(--pulse-color-text-secondary)',
+                  fontSize: '0.86rem',
+                }}
+              >
+                Supports MP3, WAV, FLAC, OGG, M4A, AAC, and WEBM. Stored safely in your local
+                desktop database.
               </p>
             </div>
             <div>
@@ -514,10 +539,7 @@ export default function LibraryView() {
           <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>
             Local & Curated Open Audio ({localTracks.length})
           </h2>
-          <VirtualizedTrackList
-            tracks={localTracks}
-            ownedPlaylists={playlists}
-          />
+          <VirtualizedTrackList tracks={localTracks} ownedPlaylists={playlists} />
         </div>
       ) : null}
 
@@ -544,7 +566,9 @@ export default function LibraryView() {
 
             {activePlaylist.itemsRestrictedByDevMode ? (
               <article className="pulse-card" role="status">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
+                >
                   <Lock size={16} color="var(--pulse-color-accent)" />
                   <span>Playlist items restricted by Spotify Development Mode</span>
                 </div>
@@ -599,7 +623,9 @@ export default function LibraryView() {
           </div>
         ) : (
           <div>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', maxWidth: '460px' }}>
+            <div
+              style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', maxWidth: '460px' }}
+            >
               <input
                 type="text"
                 aria-label="New playlist name"

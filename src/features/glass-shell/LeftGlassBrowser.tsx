@@ -1,21 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import {
-  ArrowLeft,
-  Disc3,
-  ListPlus,
-  Play,
-  Plus,
-  Search,
-  Shuffle,
-  Trash2,
-} from 'lucide-react';
+import { ArrowLeft, Disc3, ListPlus, Play, Plus, Search, Shuffle, Trash2 } from 'lucide-react';
 import { getSpotifyClient } from '@/api/clientInstance';
-import { DEMO_TRACKS, DEMO_USER } from '@/api/demoCatalog';
 import type { Track } from '@/api/schemas/catalog';
 import type { FullPlaylist, SimplifiedPlaylist } from '@/api/schemas/playlist';
 import {
-  CURATED_OPEN_TRACKS,
   getCuratedAndLocalTracks,
   importAudioFiles,
 } from '@/features/local-audio/localAudioService';
@@ -54,7 +43,6 @@ export function LeftGlassBrowser() {
   const setActiveRoute = useUiStore((s) => s.setActiveRoute);
 
   const authStatus = useAuthStore((s) => s.status);
-  const setDemoSession = useAuthStore((s) => s.setDemoSession);
   const currentUser = useAuthStore((s) => s.user);
 
   const currentTrack = usePlayerStore((s) => s.currentTrack);
@@ -64,12 +52,14 @@ export function LeftGlassBrowser() {
   const showTrackArtwork = useThemeStore((s) => s.showTrackArtwork);
 
   const [query, setQuery] = useState('');
-  const [searchTracks, setSearchTracks] = useState<Track[]>(() => [...DEMO_TRACKS]);
+  const [searchTracks, setSearchTracks] = useState<Track[]>([]);
   const [searching, setSearching] = useState(false);
 
-  const [libSubFilter, setLibSubFilter] = useState<LibrarySubFilter>('local');
-  const [savedTracks, setSavedTracks] = useState<Track[]>(() => [...DEMO_TRACKS]);
-  const [localTracks, setLocalTracks] = useState<Track[]>(() => [...CURATED_OPEN_TRACKS]);
+  const [libSubFilter, setLibSubFilter] = useState<LibrarySubFilter>(() =>
+    authStatus === 'authenticated' ? 'tracks' : 'local',
+  );
+  const [savedTracks, setSavedTracks] = useState<Track[]>([]);
+  const [localTracks, setLocalTracks] = useState<Track[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [playlists, setPlaylists] = useState<SimplifiedPlaylist[]>([]);
@@ -87,7 +77,7 @@ export function LeftGlassBrowser() {
       const items = await getCuratedAndLocalTracks();
       setLocalTracks(items);
     } catch {
-      setLocalTracks([...CURATED_OPEN_TRACKS]);
+      setLocalTracks([]);
     }
   }, []);
 
@@ -143,7 +133,7 @@ export function LeftGlassBrowser() {
     const customConverted = customList.map(customPlaylistToSimplified);
 
     if (!isConnected) {
-      setSavedTracks([...DEMO_TRACKS]);
+      setSavedTracks([]);
       setPlaylists(customConverted);
       return;
     }
@@ -170,7 +160,7 @@ export function LeftGlassBrowser() {
     }
     const trimmed = query.trim();
     if (!trimmed) {
-      setSearchTracks(savedTracks.length > 0 ? savedTracks : [...DEMO_TRACKS]);
+      setSearchTracks(savedTracks.length > 0 ? savedTracks : localTracks);
       setSearching(false);
       return undefined;
     }
@@ -178,7 +168,7 @@ export function LeftGlassBrowser() {
     if (!isConnected) {
       const lower = trimmed.toLowerCase();
       setSearchTracks(
-        DEMO_TRACKS.filter(
+        localTracks.filter(
           (t) =>
             t.name.toLowerCase().includes(lower) ||
             t.artists.some((a) => a.name.toLowerCase().includes(lower)),
@@ -211,7 +201,7 @@ export function LeftGlassBrowser() {
     return () => {
       clearTimeout(timer);
     };
-  }, [isConnected, leftPaneTab, query, savedTracks]);
+  }, [isConnected, leftPaneTab, localTracks, query, savedTracks]);
 
   const displayedTracks = useMemo<readonly Track[]>(() => {
     if (leftPaneTab === 'search') {
@@ -255,9 +245,6 @@ export function LeftGlassBrowser() {
   });
 
   const handlePlayTrack = (track: Track, contextUri?: string) => {
-    if (authStatus !== 'authenticated' && authStatus !== 'demo') {
-      setDemoSession(DEMO_USER);
-    }
     setStatusNote('');
     void playerController.playTrack(track, contextUri);
   };
@@ -351,25 +338,24 @@ export function LeftGlassBrowser() {
     if (!isPlaying) {
       return 'Nothing playing';
     }
+    if (currentTrack && (currentTrack.is_local || currentTrack.uri?.startsWith('pulse:local:'))) {
+      return `Local: ${currentTrack.name}`;
+    }
     if (authStatus === 'authenticated') {
-      return `Playing on ${activeDevice?.name ?? 'Pulse'}`;
+      return `Playing on ${activeDevice?.name ?? 'Spotify'}`;
     }
     if (authStatus === 'demo') {
-      return `Playing on ${activeDevice?.name ?? 'Pulse (Sample)'}`;
+      return `Playing on ${activeDevice?.name ?? 'Pulse (Demo)'}`;
     }
     return 'Playing on Pulse';
-  }, [activeDevice?.name, authStatus, isPlaying, searching, statusNote]);
+  }, [activeDevice?.name, authStatus, currentTrack, isPlaying, searching, statusNote]);
 
   return (
     <aside className="gp-glass-panel gp-left-pane" aria-label="Music browser">
       {/* Top Search + Import Row */}
       <div className="gp-search-row">
         <div className="gp-search-box">
-          <Search
-            size={15}
-            style={{ opacity: 0.6, flexShrink: 0 }}
-            aria-hidden="true"
-          />
+          <Search size={15} style={{ opacity: 0.6, flexShrink: 0 }} aria-hidden="true" />
           <input
             type="search"
             className="gp-search-input"
@@ -472,8 +458,19 @@ export function LeftGlassBrowser() {
               </div>
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              <div style={{ display: 'inline-flex', gap: '4px' }} role="tablist" aria-label="Library view">
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+              }}
+            >
+              <div
+                style={{ display: 'inline-flex', gap: '4px' }}
+                role="tablist"
+                aria-label="Library view"
+              >
                 <button
                   type="button"
                   role="tab"
@@ -517,7 +514,9 @@ export function LeftGlassBrowser() {
                   type="button"
                   className="pulse-nav-btn"
                   style={{ width: 'auto', padding: '3px 8px', fontSize: '11px', gap: '3px' }}
-                  onClick={() => { setCreatePlaylistModalOpen(true); }}
+                  onClick={() => {
+                    setCreatePlaylistModalOpen(true);
+                  }}
                   title="Create custom playlist"
                 >
                   <Plus size={12} />
@@ -613,9 +612,20 @@ export function LeftGlassBrowser() {
         {showPlaylistsGrid ? (
           playlists.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '24px 12px', opacity: 0.75 }}>
-              <ListPlus size={28} style={{ margin: '0 auto 8px', display: 'block' }} color="var(--pulse-color-accent)" />
+              <ListPlus
+                size={28}
+                style={{ margin: '0 auto 8px', display: 'block' }}
+                color="var(--pulse-color-accent)"
+              />
               <div style={{ fontSize: '0.86rem', fontWeight: 600 }}>No Playlists Yet</div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--pulse-color-text-secondary)', marginTop: '4px', marginBottom: '10px' }}>
+              <div
+                style={{
+                  fontSize: '0.78rem',
+                  color: 'var(--pulse-color-text-secondary)',
+                  marginTop: '4px',
+                  marginBottom: '10px',
+                }}
+              >
                 Create your own playlists with your uploaded music or curated tracks!
               </div>
               <button
@@ -630,7 +640,9 @@ export function LeftGlassBrowser() {
                   fontWeight: 600,
                   fontSize: '0.82rem',
                 }}
-                onClick={() => { setCreatePlaylistModalOpen(true); }}
+                onClick={() => {
+                  setCreatePlaylistModalOpen(true);
+                }}
               >
                 <Plus size={13} />
                 <span>Create Playlist</span>
@@ -666,12 +678,16 @@ export function LeftGlassBrowser() {
                   <span className="gp-track-meta">
                     <span className="gp-track-title">{pl.name}</span>
                     <span className="gp-track-artist">
-                      {isCustom ? 'Custom Playlist (Offline)' : (pl.owner.display_name ?? pl.owner.id)}
+                      {isCustom
+                        ? 'Custom Playlist (Offline)'
+                        : (pl.owner.display_name ?? pl.owner.id)}
                       {!isOwned ? ' • Editorial' : ''}
                     </span>
                   </span>
                   <span className="gp-track-duration">
-                    {pl.itemsSummary ? `${pl.itemsSummary.total} ${pl.itemsSummary.total === 1 ? 'song' : 'songs'}` : '—'}
+                    {pl.itemsSummary
+                      ? `${pl.itemsSummary.total} ${pl.itemsSummary.total === 1 ? 'song' : 'songs'}`
+                      : '—'}
                   </span>
                 </button>
               );
@@ -686,9 +702,30 @@ export function LeftGlassBrowser() {
             </p>
           </div>
         ) : displayedTracks.length === 0 ? (
-          <p style={{ opacity: 0.6, padding: '12px 6px', fontSize: '13px' }}>
-            No tracks match your search.
-          </p>
+          <div style={{ textAlign: 'center', padding: '24px 12px', opacity: 0.75 }}>
+            <div style={{ fontSize: '0.86rem', fontWeight: 600 }}>
+              {libSubFilter === 'local' && leftPaneTab === 'library'
+                ? 'No Local Audio Files'
+                : leftPaneTab === 'search'
+                  ? 'No search results'
+                  : 'No Songs Found'}
+            </div>
+            <div
+              style={{
+                fontSize: '0.78rem',
+                color: 'var(--pulse-color-text-secondary)',
+                marginTop: '4px',
+              }}
+            >
+              {libSubFilter === 'local' && leftPaneTab === 'library'
+                ? 'Drop your audio files (MP3, WAV, FLAC, M4A) here to build your local library.'
+                : leftPaneTab === 'search'
+                  ? 'Try searching for another song title or artist.'
+                  : !isConnected
+                    ? 'Connect Spotify in Settings or switch to Local music.'
+                    : 'No tracks match your current view.'}
+            </div>
+          </div>
         ) : displayedTracks.length > 80 ? (
           <div
             style={{
@@ -737,7 +774,13 @@ export function LeftGlassBrowser() {
                       tabIndex={0}
                       title="Add to Playlist"
                       aria-label={`Add ${track.name} to playlist`}
-                      style={{ padding: '3px', borderRadius: '4px', opacity: 0.65, cursor: 'pointer', display: 'inline-flex' }}
+                      style={{
+                        padding: '3px',
+                        borderRadius: '4px',
+                        opacity: 0.65,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         setPlaylistSelectTrack(track);
@@ -757,7 +800,13 @@ export function LeftGlassBrowser() {
                         tabIndex={0}
                         title="Remove from playlist"
                         aria-label={`Remove ${track.name} from playlist`}
-                        style={{ padding: '3px', borderRadius: '4px', opacity: 0.65, cursor: 'pointer', display: 'inline-flex' }}
+                        style={{
+                          padding: '3px',
+                          borderRadius: '4px',
+                          opacity: 0.65,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                        }}
                         onClick={(e) => {
                           e.stopPropagation();
                           void handleRemoveTrackFromCurrentPlaylist(track.uri);
@@ -807,7 +856,13 @@ export function LeftGlassBrowser() {
                     tabIndex={0}
                     title="Add to Playlist"
                     aria-label={`Add ${track.name} to playlist`}
-                    style={{ padding: '3px', borderRadius: '4px', opacity: 0.65, cursor: 'pointer', display: 'inline-flex' }}
+                    style={{
+                      padding: '3px',
+                      borderRadius: '4px',
+                      opacity: 0.65,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setPlaylistSelectTrack(track);
@@ -827,7 +882,13 @@ export function LeftGlassBrowser() {
                       tabIndex={0}
                       title="Remove from playlist"
                       aria-label={`Remove ${track.name} from playlist`}
-                      style={{ padding: '3px', borderRadius: '4px', opacity: 0.65, cursor: 'pointer', display: 'inline-flex' }}
+                      style={{
+                        padding: '3px',
+                        borderRadius: '4px',
+                        opacity: 0.65,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         void handleRemoveTrackFromCurrentPlaylist(track.uri);
@@ -916,7 +977,9 @@ export function LeftGlassBrowser() {
 
       <CreatePlaylistModal
         isOpen={createPlaylistModalOpen}
-        onClose={() => { setCreatePlaylistModalOpen(false); }}
+        onClose={() => {
+          setCreatePlaylistModalOpen(false);
+        }}
         onCreated={(newPl) => {
           void (async () => {
             await refreshCustomPlaylists();
@@ -928,7 +991,9 @@ export function LeftGlassBrowser() {
       <PlaylistSelectModal
         track={playlistSelectTrack}
         isOpen={playlistSelectTrack !== null}
-        onClose={() => { setPlaylistSelectTrack(null); }}
+        onClose={() => {
+          setPlaylistSelectTrack(null);
+        }}
         onUpdated={() => {
           void (async () => {
             await refreshCustomPlaylists();

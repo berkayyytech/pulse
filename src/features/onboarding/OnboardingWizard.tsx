@@ -19,7 +19,6 @@ import { getSpotifyClient } from '@/api/clientInstance';
 import { DEMO_USER } from '@/api/demoCatalog';
 import { DEMO_TRACKS } from '@/api/demoCatalog';
 import { getValidAccessToken, signOutSpotify, startPkceLogin } from '@/features/auth/authService';
-import { CURATED_OPEN_TRACKS } from '@/features/local-audio/localAudioService';
 import { playerController } from '@/features/player/playerController';
 import { scheduleDesktopSettingsSave } from '@/platform/desktopSettingsSync';
 import { openExternalUrl } from '@/platform/openExternal';
@@ -65,10 +64,6 @@ export function OnboardingWizard() {
     setAccountTier(tier);
     scheduleDesktopSettingsSave();
     if (tier === 'local-only') {
-      const firstTrack = CURATED_OPEN_TRACKS[0];
-      if (firstTrack) {
-        void playerController.playTrack(firstTrack);
-      }
       useAchievementStore.getState().setFlag('sampleLibraryLaunched');
       setActiveRoute('library');
       useUiStore.getState().setLeftPaneTab('library');
@@ -122,7 +117,7 @@ export function OnboardingWizard() {
   const handleLaunchOfflineDemo = () => {
     setDemoSession(DEMO_USER);
     setPlaybackSnapshot({
-      currentTrack: CURATED_OPEN_TRACKS[0] ?? DEMO_TRACKS[0] ?? null,
+      currentTrack: DEMO_TRACKS[0] ?? null,
       isPlaying: false,
       positionMs: 0,
     });
@@ -154,7 +149,9 @@ export function OnboardingWizard() {
         Connect Your Own Spotify Client ID & Playback Modes
       </h1>
       <p style={{ color: 'var(--pulse-color-text-secondary)', maxWidth: '75ch', marginTop: 0 }}>
-        Pulse is built for everyone. Choose how you want to listen: use our built-in local audio player with zero account required, connect your free Spotify account for lyrics & remote control, or unlock full in-app Web Playback SDK streaming with Spotify Premium.
+        Pulse is built for everyone. Choose how you want to listen: use our built-in local audio
+        player with zero account required, connect your free Spotify account for lyrics & remote
+        control, or unlock full in-app Web Playback SDK streaming with Spotify Premium.
       </p>
 
       {/* Mode Selection Cards */}
@@ -189,7 +186,14 @@ export function OnboardingWizard() {
           }}
         >
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '0.5rem',
+              }}
+            >
               <span className="pulse-mono-pill" data-tone="accent">
                 100% Free • No Login
               </span>
@@ -197,12 +201,27 @@ export function OnboardingWizard() {
                 <CheckCircle2 size={18} color="var(--pulse-color-signal)" />
               ) : null}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                marginBottom: '0.4rem',
+              }}
+            >
               <Disc3 size={20} color="var(--pulse-color-accent)" />
               <strong style={{ fontSize: '1.05rem' }}>Local & Royalty-Free Player</strong>
             </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--pulse-color-text-secondary)', margin: 0, lineHeight: 1.45 }}>
-              Zero Spotify account required. Drag & drop your local audio files (MP3, FLAC, WAV, M4A) and enjoy built-in curated Lofi, Synthwave, and procedural ambient music!
+            <p
+              style={{
+                fontSize: '0.85rem',
+                color: 'var(--pulse-color-text-secondary)',
+                margin: 0,
+                lineHeight: 1.45,
+              }}
+            >
+              Zero Spotify account required. Drag & drop your local audio files (MP3, FLAC, WAV,
+              M4A) and enjoy built-in curated Lofi, Synthwave, and procedural ambient music!
             </p>
           </div>
           <button
@@ -249,7 +268,14 @@ export function OnboardingWizard() {
           }}
         >
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '0.5rem',
+              }}
+            >
               <span className="pulse-mono-pill" data-tone="signal">
                 Free Spotify Account
               </span>
@@ -257,12 +283,27 @@ export function OnboardingWizard() {
                 <CheckCircle2 size={18} color="var(--pulse-color-signal)" />
               ) : null}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                marginBottom: '0.4rem',
+              }}
+            >
               <Radio size={20} color="var(--pulse-color-signal)" />
               <strong style={{ fontSize: '1.05rem' }}>Spotify Free Companion</strong>
             </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--pulse-color-text-secondary)', margin: 0, lineHeight: 1.45 }}>
-              Browse your playlists & library, get synchronized LRCLIB lyrics, and control your Spotify desktop or mobile app via Spotify Connect without SDK 403 errors.
+            <p
+              style={{
+                fontSize: '0.85rem',
+                color: 'var(--pulse-color-text-secondary)',
+                margin: 0,
+                lineHeight: 1.45,
+              }}
+            >
+              Browse your playlists & library, get synchronized LRCLIB lyrics, and control your
+              Spotify desktop or mobile app via Spotify Connect without SDK 403 errors.
             </p>
           </div>
           <button
@@ -307,7 +348,14 @@ export function OnboardingWizard() {
           }}
         >
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '0.5rem',
+              }}
+            >
               <span className="pulse-mono-pill" data-tone="neutral">
                 Spotify Premium
               </span>
@@ -315,12 +363,27 @@ export function OnboardingWizard() {
                 <CheckCircle2 size={18} color="var(--pulse-color-signal)" />
               ) : null}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                marginBottom: '0.4rem',
+              }}
+            >
               <Sparkles size={20} color="var(--pulse-color-accent)" />
               <strong style={{ fontSize: '1.05rem' }}>Spotify Premium</strong>
             </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--pulse-color-text-secondary)', margin: 0, lineHeight: 1.45 }}>
-              Direct in-app Web Playback SDK streaming without opening any external apps, plus seamless transfer to all Spotify Connect smart speakers and devices.
+            <p
+              style={{
+                fontSize: '0.85rem',
+                color: 'var(--pulse-color-text-secondary)',
+                margin: 0,
+                lineHeight: 1.45,
+              }}
+            >
+              Direct in-app Web Playback SDK streaming without opening any external apps, plus
+              seamless transfer to all Spotify Connect smart speakers and devices.
             </p>
           </div>
           <button
@@ -338,7 +401,9 @@ export function OnboardingWizard() {
             }}
           >
             <Check size={15} />
-            <span>{accountTier === 'spotify-premium' ? 'Selected' : 'Use Spotify Premium Mode'}</span>
+            <span>
+              {accountTier === 'spotify-premium' ? 'Selected' : 'Use Spotify Premium Mode'}
+            </span>
           </button>
         </article>
       </div>
@@ -449,15 +514,36 @@ export function OnboardingWizard() {
           marginBottom: 'var(--pulse-space-4)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 700, color: 'var(--pulse-color-accent)' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            fontWeight: 700,
+            color: 'var(--pulse-color-accent)',
+          }}
+        >
           <AlertCircle size={20} />
-          <span style={{ fontSize: '1.05rem' }}>Do You Have a Free Spotify Account? Read This First</span>
+          <span style={{ fontSize: '1.05rem' }}>
+            Do You Have a Free Spotify Account? Read This First
+          </span>
         </div>
         <p style={{ margin: '0.6rem 0 0.35rem', lineHeight: 1.5 }}>
-          Spotify now restricts <code>developer.spotify.com</code> so that <strong>only Spotify Premium accounts can create new developer apps</strong>. If you try to create an app with a free account, Spotify shows the message: <em>&quot;Upgrade to Spotify Premium to access the Web API&quot;</em> and refuses to save.
+          Spotify now restricts <code>developer.spotify.com</code> so that{' '}
+          <strong>only Spotify Premium accounts can create new developer apps</strong>. If you try
+          to create an app with a free account, Spotify shows the message:{' '}
+          <em>&quot;Upgrade to Spotify Premium to access the Web API&quot;</em> and refuses to save.
         </p>
-        <p style={{ margin: '0 0 0.75rem', color: 'var(--pulse-color-text-secondary)', fontSize: '0.88rem' }}>
-          <strong>You do NOT need to create a Spotify app to use Pulse!</strong> Pulse includes a 100% free standalone Local &amp; Royalty-Free audio player with drag &amp; drop and built-in music.
+        <p
+          style={{
+            margin: '0 0 0.75rem',
+            color: 'var(--pulse-color-text-secondary)',
+            fontSize: '0.88rem',
+          }}
+        >
+          <strong>You do NOT need to create a Spotify app to use Pulse!</strong> Pulse includes a
+          100% free standalone Local &amp; Royalty-Free audio player with drag &amp; drop and
+          built-in music.
         </p>
         <button
           type="button"
@@ -496,16 +582,23 @@ export function OnboardingWizard() {
               onClick={(e) => {
                 if (isTauriRuntime()) {
                   e.preventDefault();
-                  void openExternalUrl('https://developer.spotify.com/dashboard').catch((err: unknown) => {
-                    setLocalError(
-                      err instanceof Error
-                        ? err.message
-                        : 'Open https://developer.spotify.com/dashboard in your browser.',
-                    );
-                  });
+                  void openExternalUrl('https://developer.spotify.com/dashboard').catch(
+                    (err: unknown) => {
+                      setLocalError(
+                        err instanceof Error
+                          ? err.message
+                          : 'Open https://developer.spotify.com/dashboard in your browser.',
+                      );
+                    },
+                  );
                 }
               }}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                cursor: 'pointer',
+              }}
             >
               <span>Open Dashboard</span>
               <ExternalLink size={14} aria-hidden="true" />
@@ -586,7 +679,11 @@ export function OnboardingWizard() {
           {!redirectCheck.valid && redirectCheck.reason ? (
             <p
               role="alert"
-              style={{ color: 'var(--pulse-color-danger)', margin: '0.6rem 0 0', fontSize: '0.9rem' }}
+              style={{
+                color: 'var(--pulse-color-danger)',
+                margin: '0.6rem 0 0',
+                fontSize: '0.9rem',
+              }}
             >
               {redirectCheck.reason}
             </p>
