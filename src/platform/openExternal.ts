@@ -9,8 +9,8 @@ import { isTauriRuntime } from './runtime';
  */
 export async function openExternalUrl(rawUrl: string): Promise<void> {
   const parsed = new URL(rawUrl);
-  if (parsed.protocol !== 'https:') {
-    throw new Error('Only HTTPS external links may be opened.');
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'spotify:') {
+    throw new Error('Only HTTPS or Spotify external links may be opened.');
   }
   const safeUrl = parsed.toString();
 

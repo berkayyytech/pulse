@@ -140,6 +140,9 @@ export function App() {
       if (p.isPlaying) {
         useAchievementStore.getState().incrementMetric('listeningSeconds', 1);
       }
+      if (sessionSec % 5 === 0 && useAuthStore.getState().status === 'authenticated') {
+        void playerController.refreshPlaybackState();
+      }
     }, 1000);
 
     const unsubTheme = useThemeStore.subscribe((next, prev) => {

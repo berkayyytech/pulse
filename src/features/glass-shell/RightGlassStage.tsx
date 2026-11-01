@@ -1,5 +1,6 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
 import {
+  ExternalLink,
   ListMusic,
   MicVocal,
   Pause,
@@ -18,7 +19,8 @@ import { bindMediaSessionHandlers, syncMediaSessionMetadata } from '@/features/p
 import { playerController } from '@/features/player/playerController';
 import { PluginSlotView } from '@/features/plugins/PluginSlotView';
 import { applyDynamicAlbumAccentIfEnabled } from '@/features/themes/extractDominantAccent';
-import { openPulsePopupWindow } from '@/platform/openExternal';
+import { openExternalUrl, openPulsePopupWindow } from '@/platform/openExternal';
+import { isTauriRuntime } from '@/platform/runtime';
 import { useAchievementStore } from '@/stores/achievementStore';
 import { useAuthStore } from '@/stores/authStore';
 import { usePlayerStore } from '@/stores/playerStore';
@@ -106,6 +108,7 @@ export function RightGlassStage() {
   };
 
   const coverUrl = currentTrack?.album?.images[0]?.url ?? FALLBACK_HERO_ART;
+  const spotifyTrackUrl = currentTrack?.external_urls.spotify;
   const durationMs = Math.max(1, currentTrack?.duration_ms ?? 1);
   const clampedPos = Math.min(positionMs, durationMs);
   const seekProgressPct = (clampedPos / durationMs) * 100;
@@ -234,6 +237,34 @@ export function RightGlassStage() {
             ? currentTrack.artists.map((a) => a.name).join(', ')
             : 'Pick a track from the list'}
         </p>
+        {spotifyTrackUrl ? (
+          <div style={{ marginTop: '2px', textAlign: 'center' }}>
+            <a
+              href={spotifyTrackUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                if (isTauriRuntime()) {
+                  e.preventDefault();
+                  void openExternalUrl(spotifyTrackUrl).catch(() => undefined);
+                }
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '11px',
+                color: 'var(--pulse-color-accent)',
+                textDecoration: 'none',
+                opacity: 0.85,
+              }}
+              title="Open track in Spotify"
+            >
+              <ExternalLink size={11} />
+              <span>Open in Spotify</span>
+            </a>
+          </div>
+        ) : null}
 
         {/* Seek Rail & Timestamps */}
         <div className="gp-stage-seek-group">

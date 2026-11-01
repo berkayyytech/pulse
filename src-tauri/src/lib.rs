@@ -67,8 +67,29 @@ fn vault_delete(key: String) -> Result<(), String> {
 #[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
     let parsed = Url::parse(&url).map_err(|e| format!("Invalid URL: {e}"))?;
+    if parsed.scheme() == "spotify" {
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            std::process::Command::new("cmd")
+                .args(["/c", "start", "", &url])
+                .creation_flags(CREATE_NO_WINDOW)
+                .spawn()
+                .map_err(|e| format!("Failed to open Spotify link: {e}"))?;
+            return Ok(());
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            std::process::Command::new("xdg-open")
+                .arg(&url)
+                .spawn()
+                .map_err(|e| format!("Failed to open Spotify link: {e}"))?;
+            return Ok(());
+        }
+    }
     if parsed.scheme() != "https" {
-        return Err("Only HTTPS external URLs are permitted".to_string());
+        return Err("Only HTTPS or Spotify external URLs are permitted".to_string());
     }
     let host = parsed.host_str().unwrap_or_default();
     let allowed = matches!(
