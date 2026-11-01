@@ -338,7 +338,7 @@ export function LeftGlassBrowser() {
     if (!isPlaying) {
       return 'Nothing playing';
     }
-    if (currentTrack && (currentTrack.is_local || currentTrack.uri?.startsWith('pulse:local:'))) {
+    if (currentTrack && (currentTrack.is_local || currentTrack.uri.startsWith('pulse:local:'))) {
       return `Local: ${currentTrack.name}`;
     }
     if (authStatus === 'authenticated') {

@@ -4,6 +4,7 @@ import {
   checkForGitHubReleaseUpdate,
   downloadAndInstallDesktopUpdate,
   getBundledAppVersion,
+  isNewerSemver,
   isValidGithubRepoSlug,
   resolveRunningAppVersion,
   type AvailableReleaseInfo,
@@ -27,15 +28,17 @@ export interface PersistedUpdaterPrefs {
   readonly includePrereleases: boolean;
   readonly repoSlug: string;
   readonly skippedVersion: string | null;
+  readonly lastAttemptedVersion: string | null;
   readonly lastCheckedAtIso: string | null;
 }
 
 const DEFAULT_PREFS: PersistedUpdaterPrefs = {
   checkOnStartup: true,
-  autoInstallUpdates: true,
+  autoInstallUpdates: false,
   includePrereleases: false,
   repoSlug: DEFAULT_UPDATE_REPO,
   skippedVersion: null,
+  lastAttemptedVersion: null,
   lastCheckedAtIso: null,
 };
 
@@ -67,6 +70,8 @@ function loadUpdaterPrefs(): PersistedUpdaterPrefs {
           ? parsed.repoSlug.trim()
           : DEFAULT_PREFS.repoSlug,
       skippedVersion: typeof parsed.skippedVersion === 'string' ? parsed.skippedVersion : null,
+      lastAttemptedVersion:
+        typeof parsed.lastAttemptedVersion === 'string' ? parsed.lastAttemptedVersion : null,
       lastCheckedAtIso:
         typeof parsed.lastCheckedAtIso === 'string' ? parsed.lastCheckedAtIso : null,
     };
@@ -85,6 +90,7 @@ function saveUpdaterPrefs(state: UpdaterStoreState): void {
     includePrereleases: state.includePrereleases,
     repoSlug: state.repoSlug,
     skippedVersion: state.skippedVersion,
+    lastAttemptedVersion: state.lastAttemptedVersion,
     lastCheckedAtIso: state.lastCheckedAtIso,
   };
   localStorage.setItem(UPDATER_STORAGE_KEY, JSON.stringify(payload));
@@ -102,6 +108,7 @@ interface UpdaterStoreState extends PersistedUpdaterPrefs {
   setIncludePrereleases: (enabled: boolean) => void;
   setRepoSlug: (slug: string) => void;
   skipVersion: (version: string | null) => void;
+  clearAttemptedVersion: () => void;
   dismissBannerForSession: () => void;
   setPwaRefreshReady: (ready: boolean) => void;
   checkForUpdates: (options?: { manual?: boolean; fetchImpl?: typeof fetch }) => Promise<void>;
@@ -149,6 +156,11 @@ export const useUpdaterStore = create<UpdaterStoreState>((set, get) => ({
     saveUpdaterPrefs(get());
   },
 
+  clearAttemptedVersion: () => {
+    set({ lastAttemptedVersion: null });
+    saveUpdaterPrefs(get());
+  },
+
   dismissBannerForSession: () => {
     set({ bannerDismissedForSession: true });
   },
@@ -164,6 +176,13 @@ export const useUpdaterStore = create<UpdaterStoreState>((set, get) => ({
     try {
       const runningVersion = await resolveRunningAppVersion();
       const s = get();
+
+      // If running version has caught up to or passed lastAttemptedVersion, clear it
+      if (s.lastAttemptedVersion && !isNewerSemver(runningVersion, s.lastAttemptedVersion)) {
+        set({ lastAttemptedVersion: null });
+        saveUpdaterPrefs(get());
+      }
+
       const result = await checkForGitHubReleaseUpdate({
         repoSlug: s.repoSlug,
         currentVersion: runningVersion,
@@ -231,7 +250,9 @@ export const useUpdaterStore = create<UpdaterStoreState>((set, get) => ({
     set({
       status: 'installing',
       statusMessage: `Downloading & verifying ${installer.name}…`,
+      lastAttemptedVersion: release.version,
     });
+    saveUpdaterPrefs(get());
 
     try {
       await downloadAndInstallDesktopUpdate(installer, silentInstall);

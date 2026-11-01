@@ -23,6 +23,7 @@
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build",
+    "version:bump": "node scripts/bumpVersion.mjs",
     "make:video": "node scripts/recordRealAppVideo.mjs"
   },
   "dependencies": {

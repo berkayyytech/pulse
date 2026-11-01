@@ -146,7 +146,9 @@ describe('Updater Engine (GitHub Releases SemVer + .exe Auto-Install)', () => {
       }
       return Promise.resolve('C:\\Temp\\pulse-updates\\Pulse_0.3.0_x64-setup.exe');
     });
-    (window as unknown as { __TAURI_INTERNALS__?: { invoke: typeof invokeMock } }).__TAURI_INTERNALS__ = {
+    (
+      window as unknown as { __TAURI_INTERNALS__?: { invoke: typeof invokeMock } }
+    ).__TAURI_INTERNALS__ = {
       invoke: invokeMock,
     };
 
@@ -167,8 +169,51 @@ describe('Updater Engine (GitHub Releases SemVer + .exe Auto-Install)', () => {
         undefined,
       );
       expect(useUpdaterStore.getState().status).toBe('installed-restarting');
+      expect(useUpdaterStore.getState().lastAttemptedVersion).toBe('0.3.0');
     } finally {
       delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+    }
+  });
+
+  it('rejects older or equal installer assets attached to a newer release to prevent infinite update loops', async () => {
+    // Scenario: GitHub release tag is V1.0.4, but user uploaded Pulse_1.0.3_x64-setup.exe
+    const mockMismatchedRelease = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          {
+            tag_name: 'V1.0.4_Fix',
+            name: 'Pulse V1.0.4 Fix',
+            body: 'Bug Fixes',
+            html_url: 'https://github.com/berkayyytech/pulse/releases/tag/V1.0.4_Fix',
+            published_at: '2026-11-01T21:30:51Z',
+            draft: false,
+            prerelease: false,
+            assets: [
+              {
+                name: 'Pulse_1.0.3_x64-setup.exe',
+                browser_download_url:
+                  'https://github.com/berkayyytech/pulse/releases/download/V1.0.4_Fix/Pulse_1.0.3_x64-setup.exe',
+                size: 5_985_378,
+                digest: 'sha256:dde5bbdecbaf2e53aabbbb6c8eb17d57ec4531c5b1629c2ed055b5e3f294e033',
+              },
+            ],
+          },
+        ]),
+        { status: 200 },
+      ),
+    );
+
+    const res = await checkForGitHubReleaseUpdate({
+      repoSlug: 'berkayyytech/pulse',
+      currentVersion: '1.0.3',
+      fetchImpl: mockMismatchedRelease,
+    });
+
+    expect(res.outcome).toBe('update-available');
+    if (res.outcome === 'update-available') {
+      expect(res.release.version).toBe('1.0.4_Fix');
+      // The outdated 1.0.3 installer must be REJECTED to prevent an infinite reinstall loop!
+      expect(res.release.windowsInstaller).toBeNull();
     }
   });
 });

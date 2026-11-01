@@ -149,30 +149,83 @@ export type UpdateCheckResult =
       readonly currentVersion: string;
     };
 
-function pickWindowsInstallerAsset(
-  assets: readonly z.infer<typeof GitHubAssetSchema>[],
-): ReleaseInstallerAsset | null {
-  const nsisSetup =
-    assets.find((a) => /setup\.exe$/i.test(a.name)) ??
-    assets.find((a) => /\.msi$/i.test(a.name)) ??
-    assets.find((a) => /\.exe$/i.test(a.name));
-
-  if (!nsisSetup) {
+export function extractSemverFromFilename(filename: string): ParsedSemver | null {
+  const match = /(?:^|[^\d])(\d+\.\d+(?:\.\d+)?(?:[-_][0-9A-Za-z.-]+)?)/.exec(filename);
+  if (!match || !match[1]) {
     return null;
   }
+  return parseSemverTag(match[1]);
+}
 
-  const rawDigest = nsisSetup.digest ?? null;
+function toReleaseInstallerAsset(asset: z.infer<typeof GitHubAssetSchema>): ReleaseInstallerAsset {
+  const rawDigest = asset.digest ?? null;
   const sha256 =
     rawDigest && rawDigest.toLowerCase().startsWith('sha256:')
       ? rawDigest.slice('sha256:'.length).trim()
       : null;
 
   return {
-    name: nsisSetup.name,
-    downloadUrl: nsisSetup.browser_download_url,
-    sizeBytes: nsisSetup.size,
+    name: asset.name,
+    downloadUrl: asset.browser_download_url,
+    sizeBytes: asset.size,
     sha256,
   };
+}
+
+export function pickWindowsInstallerAsset(
+  assets: readonly z.infer<typeof GitHubAssetSchema>[],
+  targetVersion?: string,
+  currentVersion?: string,
+): ReleaseInstallerAsset | null {
+  const nsisSetupCandidates = assets.filter(
+    (a) => /setup\.exe$/i.test(a.name) || /\.msi$/i.test(a.name) || /\.exe$/i.test(a.name),
+  );
+
+  if (nsisSetupCandidates.length === 0) {
+    return null;
+  }
+
+  // 1. If targetVersion is provided, prefer an asset matching that target version
+  if (targetVersion) {
+    const targetParsed = parseSemverTag(targetVersion);
+    if (targetParsed) {
+      const matchingTarget = nsisSetupCandidates.find((a) => {
+        const assetVer = extractSemverFromFilename(a.name);
+        return (
+          assetVer &&
+          assetVer.major === targetParsed.major &&
+          assetVer.minor === targetParsed.minor &&
+          assetVer.patch === targetParsed.patch
+        );
+      });
+      if (matchingTarget) {
+        return toReleaseInstallerAsset(matchingTarget);
+      }
+    }
+  }
+
+  // 2. Reject any candidate whose filename version is <= currentVersion!
+  // e.g. Do not pick "Pulse_1.0.3_x64-setup.exe" or "Pulse_0.1.0_x64-setup.exe" when running 1.0.3
+  const validNewerCandidates = nsisSetupCandidates.filter((a) => {
+    if (!currentVersion) return true;
+    const assetVer = extractSemverFromFilename(a.name);
+    if (!assetVer) return true; // Generic names like "Pulse.exe" without embedded version
+    return isNewerSemver(
+      currentVersion,
+      `${assetVer.major}.${assetVer.minor}.${assetVer.patch}${assetVer.prerelease ? `-${assetVer.prerelease}` : ''}`,
+    );
+  });
+
+  const chosen =
+    validNewerCandidates.find((a) => /setup\.exe$/i.test(a.name)) ??
+    validNewerCandidates.find((a) => /\.msi$/i.test(a.name)) ??
+    validNewerCandidates.find((a) => /\.exe$/i.test(a.name));
+
+  if (!chosen) {
+    return null;
+  }
+
+  return toReleaseInstallerAsset(chosen);
 }
 
 function summarizeReleaseBody(rawBody: string | null | undefined): string {
@@ -320,14 +373,22 @@ export async function checkForGitHubReleaseUpdate(options: {
     };
   }
 
-  let windowsInstaller = pickWindowsInstallerAsset(chosenRelease.assets);
+  let windowsInstaller = pickWindowsInstallerAsset(
+    chosenRelease.assets,
+    cleanedVersion,
+    currentVersion,
+  );
 
   // If the absolute latest release tag does not have an attached installer yet,
   // check if another newer release has an uploaded installer
   if (!windowsInstaller) {
     for (const rel of validReleases) {
       if (isNewerSemver(currentVersion, rel.tag_name)) {
-        const candidate = pickWindowsInstallerAsset(rel.assets);
+        const candidate = pickWindowsInstallerAsset(
+          rel.assets,
+          rel.tag_name.trim().replace(/^[vV]/, ''),
+          currentVersion,
+        );
         if (candidate) {
           windowsInstaller = candidate;
           break;
@@ -336,8 +397,10 @@ export async function checkForGitHubReleaseUpdate(options: {
     }
   }
 
-  // If still not found, synthesize standard GitHub release installer asset URL so auto-update can fetch it directly
-  if (!windowsInstaller) {
+  // If still not found, synthesize standard GitHub release installer asset URL
+  // ONLY if release assets array is empty (meaning the repo hosts binaries as standard release downloads)
+  // But NOT if assets were present and were rejected because they are outdated/old version!
+  if (!windowsInstaller && chosenRelease.assets.length === 0) {
     windowsInstaller = {
       name: `Pulse_${cleanedVersion}_x64-setup.exe`,
       downloadUrl: `https://github.com/${slug}/releases/download/${chosenRelease.tag_name}/Pulse_${cleanedVersion}_x64-setup.exe`,

@@ -17,6 +17,7 @@ export function UpdateBanner() {
   const availableRelease = useUpdaterStore((s) => s.availableRelease);
   const autoInstallUpdates = useUpdaterStore((s) => s.autoInstallUpdates);
   const bannerDismissed = useUpdaterStore((s) => s.bannerDismissedForSession);
+  const lastAttemptedVersion = useUpdaterStore((s) => s.lastAttemptedVersion);
   const pwaRefreshReady = useUpdaterStore((s) => s.pwaRefreshReady);
   const statusMessage = useUpdaterStore((s) => s.statusMessage);
   const installUpdateNow = useUpdaterStore((s) => s.installUpdateNow);
@@ -25,8 +26,15 @@ export function UpdateBanner() {
   const setPwaRefreshReady = useUpdaterStore((s) => s.setPwaRefreshReady);
 
   const inDesktopExe = isTauriRuntime();
+  const hasAttemptedThisVersion =
+    lastAttemptedVersion !== null &&
+    availableRelease !== null &&
+    lastAttemptedVersion === availableRelease.version;
   const canAutoInstallExe =
-    inDesktopExe && Boolean(availableRelease?.windowsInstaller) && status === 'update-available';
+    inDesktopExe &&
+    Boolean(availableRelease?.windowsInstaller) &&
+    status === 'update-available' &&
+    !hasAttemptedThisVersion;
 
   const [autoCountdownSec, setAutoCountdownSec] = useState<number | null>(null);
   const [autoCancelled, setAutoCancelled] = useState(false);
@@ -62,13 +70,7 @@ export function UpdateBanner() {
     return () => {
       clearInterval(interval);
     };
-  }, [
-    autoCancelled,
-    autoInstallUpdates,
-    bannerDismissed,
-    canAutoInstallExe,
-    installUpdateNow,
-  ]);
+  }, [autoCancelled, autoInstallUpdates, bannerDismissed, canAutoInstallExe, installUpdateNow]);
 
   if (pwaRefreshReady && !inDesktopExe) {
     return (
@@ -155,7 +157,14 @@ export function UpdateBanner() {
         gap: '10px',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '10px',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <ArrowUpCircle size={19} color="var(--pulse-color-signal)" aria-hidden="true" />
           <div>
@@ -172,7 +181,26 @@ export function UpdateBanner() {
                 (current v{currentVersion})
               </span>
             </div>
-            <div style={{ fontSize: '0.79rem', color: 'var(--pulse-color-text-secondary)', marginTop: '2px' }}>
+            {hasAttemptedThisVersion ? (
+              <div
+                style={{
+                  fontSize: '0.78rem',
+                  color: 'var(--pulse-color-signal)',
+                  marginTop: '2px',
+                  fontWeight: 600,
+                }}
+              >
+                Update previously launched. If the version didn’t bump, grab the latest setup
+                directly from GitHub.
+              </div>
+            ) : null}
+            <div
+              style={{
+                fontSize: '0.79rem',
+                color: 'var(--pulse-color-text-secondary)',
+                marginTop: '2px',
+              }}
+            >
               {status === 'installing' || status === 'installed-restarting' || status === 'error'
                 ? statusMessage
                 : availableRelease.notesSummary}
@@ -191,7 +219,7 @@ export function UpdateBanner() {
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
-        {inDesktopExe ? (
+        {inDesktopExe && installer ? (
           <button
             type="button"
             disabled={status === 'installing' || status === 'installed-restarting'}
@@ -221,10 +249,12 @@ export function UpdateBanner() {
                 : status === 'installed-restarting'
                   ? 'Restarting…'
                   : status === 'error'
-                    ? 'Retry Auto-Update'
+                    ? 'Retry Update'
                     : autoCountdownSec !== null && autoCountdownSec > 0
                       ? `Auto-Updating in ${autoCountdownSec}s`
-                      : `Update Now${installer ? formatAssetSize(installer.sizeBytes) : ''}`}
+                      : hasAttemptedThisVersion
+                        ? `Retry Install${formatAssetSize(installer.sizeBytes)}`
+                        : `Update Now${formatAssetSize(installer.sizeBytes)}`}
             </span>
           </button>
         ) : (
@@ -264,7 +294,13 @@ export function UpdateBanner() {
         <button
           type="button"
           className="pulse-mono-pill"
-          style={{ cursor: 'pointer', padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+          style={{
+            cursor: 'pointer',
+            padding: '5px 10px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
           onClick={() => {
             void openExternalUrl(availableRelease.htmlUrl);
           }}

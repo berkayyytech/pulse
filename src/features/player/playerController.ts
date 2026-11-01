@@ -1,6 +1,5 @@
 import { getSpotifyClient } from '@/api/clientInstance';
 import type { Track } from '@/api/schemas/catalog';
-import type { ConnectDevice } from '@/api/schemas/player';
 import type { RepeatMode } from '@/api/spotifyClient';
 import { getAudioUrlForLocalTrack, getLocalTracks } from '@/features/local-audio/localAudioService';
 import { recordListenIfEnabled } from '@/features/stats/historyService';
@@ -25,7 +24,7 @@ export function isLocalOrCuratedTrack(track: Track | null): boolean {
     track.uri.startsWith('pulse:local:') ||
     track.uri.startsWith('pulse:curated:') ||
     track.uri.startsWith('pulse:demo:') ||
-    Boolean(track.is_local)
+    track.is_local
   );
 }
 
@@ -100,7 +99,9 @@ export const playerController = {
       if (sdk && store.sdkReady && typeof sdk.pause === 'function') {
         try {
           await sdk.pause();
-        } catch {}
+        } catch {
+          // Ignore
+        }
       } else if (store.activeDevice?.id && store.activeDevice.id !== 'pulse-local-audio') {
         getSpotifyClient()
           .pause(store.activeDevice.id)
@@ -192,7 +193,7 @@ export const playerController = {
         const engine = activeDev.id === store.sdkDeviceId ? 'sdk' : 'connect-remote';
         store.setEngine(engine);
         store.setPlaybackSnapshot({
-          activeDevice: activeDev as ConnectDevice,
+          activeDevice: activeDev,
           isPlaying: true,
           currentTrack: track,
         });
