@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { Settings, Trophy } from 'lucide-react';
+import { CheckCircle2, CloudUpload, Settings, Trophy } from 'lucide-react';
 import { runStartupCapabilityProbes } from '@/api/capabilities';
 import { getSpotifyClient } from '@/api/clientInstance';
 import { completePkceCallback, refreshSpotifyAccessToken } from '@/features/auth/authService';
@@ -14,6 +14,7 @@ import { GlassSettingsSheet } from '@/features/glass-shell/GlassSettingsSheet';
 import { LeftGlassBrowser } from '@/features/glass-shell/LeftGlassBrowser';
 import { RightGlassStage } from '@/features/glass-shell/RightGlassStage';
 import { SpotifyUriImportModal } from '@/features/glass-shell/SpotifyUriImportModal';
+import { importAudioFiles } from '@/features/local-audio/localAudioService';
 import { LyricsDrawer } from '@/features/lyrics/LyricsDrawer';
 import { CompactNowPlayingView } from '@/features/player/ObsOverlayView';
 import { playerController } from '@/features/player/playerController';
@@ -71,6 +72,54 @@ export function App() {
   const windowMode = getWindowMode();
   const activeEasterEgg = useAchievementStore((s) => s.activeEasterEgg);
   const unlockedCount = useAchievementStore((s) => Object.keys(s.unlockedAt).length);
+
+  const [globalDragging, setGlobalDragging] = useState(false);
+  const dragCounterRef = useRef(0);
+  const [uploadToast, setUploadToast] = useState<string | null>(null);
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer.types.includes('Files')) {
+      setGlobalDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setGlobalDragging(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setGlobalDragging(false);
+    dragCounterRef.current = 0;
+    if (e.dataTransfer.files.length > 0) {
+      const imported = await importAudioFiles(e.dataTransfer.files);
+      if (imported.length > 0) {
+        setLeftPaneTab('library');
+        useAchievementStore.getState().incrementMetric('tracksSavedCount', imported.length);
+        setUploadToast(
+          `Imported ${imported.length} song${imported.length === 1 ? '' : 's'} into your library!`,
+        );
+        setTimeout(() => { setUploadToast(null); }, 3500);
+        if (!usePlayerStore.getState().currentTrack) {
+          const first = imported[0];
+          if (first) {
+            void playerController.playTrack(first);
+          }
+        }
+      }
+    }
+  };
 
   // 0. Boot session tracking, desktop disk persistence, 1-second listening/session clock & theme achievement observer
   useEffect(() => {
@@ -365,10 +414,69 @@ export function App() {
   };
 
   return (
-    <div className="gp-viewport">
+    <div
+      className="gp-viewport"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={(e) => {
+        void handleDrop(e);
+      }}
+    >
       <a href="#main-content" className="pulse-skip-link">
         {t('app.skipToMain')}
       </a>
+
+      {globalDragging ? (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(5, 7, 10, 0.82)',
+            backdropFilter: 'blur(16px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+            border: '3px dashed var(--pulse-color-accent)',
+          }}
+        >
+          <CloudUpload size={54} color="var(--pulse-color-accent)" />
+          <h2 style={{ color: '#ffffff', marginTop: '14px', marginBottom: '6px', fontSize: '1.4rem' }}>
+            Drop Audio Files to Import
+          </h2>
+          <p style={{ color: 'rgba(255, 255, 255, 0.7)', margin: 0, fontSize: '0.92rem' }}>
+            MP3, FLAC, WAV, M4A, OGG — Added to your offline Library instantly
+          </p>
+        </div>
+      ) : null}
+
+      {uploadToast ? (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: 9990,
+            padding: '10px 16px',
+            borderRadius: 'var(--pulse-radius-md)',
+            background: 'var(--pulse-color-signal)',
+            color: '#08110c',
+            fontWeight: 700,
+            fontSize: '0.88rem',
+            boxShadow: 'var(--pulse-shadow-elevated)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <CheckCircle2 size={18} />
+          <span>{uploadToast}</span>
+        </div>
+      ) : null}
 
       {/* Atmospheric Blurred Cover Glow + Drifting Radial Spheres */}
       <div className="gp-ambient" data-disabled={!ambientGlow} aria-hidden="true">

@@ -54,6 +54,16 @@ export interface LocalTrackRecord {
   addedAt: number;
 }
 
+export interface CustomPlaylistRecord {
+  id: string;
+  name: string;
+  description?: string;
+  coverUrl?: string;
+  trackUris: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export class PulseDatabase extends Dexie {
   public apiCache!: EntityTable<ApiCacheEntry, 'cacheKey'>;
   public listeningHistory!: EntityTable<ListeningHistoryItem, 'id'>;
@@ -61,6 +71,7 @@ export class PulseDatabase extends Dexie {
   public customThemes!: EntityTable<ThemePackRecord, 'id'>;
   public capabilityCache!: EntityTable<CapabilityProbeRecord, 'capabilityId'>;
   public localTracks!: EntityTable<LocalTrackRecord, 'id'>;
+  public customPlaylists!: EntityTable<CustomPlaylistRecord, 'id'>;
 
   public constructor() {
     super('pulse_client_db_v1');
@@ -73,6 +84,9 @@ export class PulseDatabase extends Dexie {
     });
     this.version(2).stores({
       localTracks: 'id, title, artist, album, addedAt',
+    });
+    this.version(3).stores({
+      customPlaylists: 'id, name, createdAt, updatedAt',
     });
   }
 }

@@ -109,9 +109,12 @@ export function OnboardingWizard() {
           useUiStore.getState().setSettingsSheetOpen(false);
           void runStartupCapabilityProbes(client).catch(() => undefined);
           void playerController.refreshPlaybackState();
+        } else {
+          useAuthStore.getState().setSignedOut();
         }
       }
     } catch (err) {
+      useAuthStore.getState().setSignedOut();
       setLocalError(err instanceof Error ? err.message : 'Unable to start PKCE login');
     }
   };
@@ -119,12 +122,13 @@ export function OnboardingWizard() {
   const handleLaunchOfflineDemo = () => {
     setDemoSession(DEMO_USER);
     setPlaybackSnapshot({
-      currentTrack: DEMO_TRACKS[0] ?? null,
+      currentTrack: CURATED_OPEN_TRACKS[0] ?? DEMO_TRACKS[0] ?? null,
       isPlaying: false,
-      positionMs: 42_000,
+      positionMs: 0,
     });
     useAchievementStore.getState().setFlag('sampleLibraryLaunched');
     setActiveRoute('library');
+    useUiStore.getState().setLeftPaneTab('library');
     useUiStore.getState().setSettingsSheetOpen(false);
   };
 
@@ -692,9 +696,82 @@ export function OnboardingWizard() {
           </p>
 
           {localError ? (
-            <p role="alert" style={{ color: 'var(--pulse-color-danger)', marginTop: '0.5rem' }}>
-              {localError}
-            </p>
+            <div
+              role="alert"
+              className="pulse-card"
+              style={{
+                marginTop: '0.85rem',
+                padding: '12px 14px',
+                borderColor: 'var(--pulse-color-danger)',
+                background: 'rgba(239, 68, 68, 0.08)',
+              }}
+            >
+              <p
+                style={{
+                  color: 'var(--pulse-color-danger)',
+                  margin: 0,
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  lineHeight: 1.45,
+                }}
+              >
+                {localError}
+              </p>
+              <div
+                style={{
+                  marginTop: '10px',
+                  paddingTop: '10px',
+                  borderTop: '1px solid var(--pulse-color-border-subtle)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                }}
+              >
+                <span style={{ fontSize: '0.84rem', color: 'var(--pulse-color-text-secondary)' }}>
+                  You don't need Spotify! Pulse plays built-in curated tracks and local audio files.
+                </span>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="pulse-nav-btn"
+                    style={{
+                      width: 'auto',
+                      background: 'var(--pulse-color-accent)',
+                      color: 'var(--pulse-color-text-inverse)',
+                      fontWeight: 600,
+                      padding: '5px 12px',
+                      fontSize: '0.82rem',
+                    }}
+                    onClick={() => {
+                      handleSelectTier('local-only');
+                    }}
+                  >
+                    <Disc3 size={14} />
+                    <span>Launch Player Now</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="pulse-nav-btn"
+                    style={{
+                      width: 'auto',
+                      border: '1px solid var(--pulse-color-border-strong)',
+                      padding: '5px 12px',
+                      fontSize: '0.82rem',
+                    }}
+                    onClick={() => {
+                      void signOutSpotify(true).then(() => {
+                        setDraftClientId('');
+                        setLocalError(null);
+                      });
+                    }}
+                  >
+                    Reset & Clear
+                  </button>
+                </div>
+              </div>
+            </div>
           ) : null}
 
           <hr

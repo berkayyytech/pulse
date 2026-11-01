@@ -8,6 +8,16 @@ import {
   getCuratedAndLocalTracks,
   importAudioFiles,
 } from '@/features/local-audio/localAudioService';
+import {
+  addTrackToCustomPlaylist,
+  createCustomPlaylist,
+  customPlaylistToSimplified,
+  generatePlaylistCoverSvg,
+  getAllCustomPlaylists,
+  getCustomPlaylist,
+  removeTrackFromCustomPlaylist,
+  resolveCustomPlaylistTracks,
+} from '@/features/playlists/customPlaylistService';
 import { fetchOptInArtistEnrichment, type ExternalArtistMetadata } from '@/features/lyrics/externalMetadataService';
 import { useAchievementStore } from '@/stores/achievementStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -89,7 +99,11 @@ export default function LibraryView() {
   };
 
   const loadLibrary = useCallback(async () => {
+    const customList = await getAllCustomPlaylists();
+    const customConverted = customList.map(customPlaylistToSimplified);
+
     if (!isConnected) {
+      setPlaylists(customConverted);
       return;
     }
     const client = getSpotifyClient();
@@ -99,9 +113,8 @@ export default function LibraryView() {
       client.getSavedAlbums(50, 0).catch(() => null),
       client.getFollowedArtists(50).catch(() => null),
     ]);
-    if (plPage) {
-      setPlaylists(plPage.items);
-    }
+    const spotifyPlaylists = plPage ? plPage.items : [];
+    setPlaylists([...customConverted, ...spotifyPlaylists]);
     if (trkPage) {
       setSavedTracks(trkPage.items.map((i) => i.track));
     }
@@ -277,6 +290,53 @@ export default function LibraryView() {
   );
 
   const openPlaylist = async (playlistId: string) => {
+    if (playlistId.startsWith('pl_')) {
+      const pl = await getCustomPlaylist(playlistId);
+      if (pl) {
+        const resolved = await resolveCustomPlaylistTracks(pl);
+        const full: FullPlaylist = {
+          id: pl.id,
+          name: pl.name,
+          description: pl.description || '',
+          collaborative: false,
+          public: true,
+          snapshot_id: `${pl.updatedAt}`,
+          uri: `pulse:playlist:${pl.id}`,
+          images: [
+            {
+              url: pl.coverUrl || generatePlaylistCoverSvg(pl.name, pl.trackUris.length),
+              height: 400,
+              width: 400,
+            },
+          ],
+          owner: {
+            id: 'pulse-local',
+            display_name: 'You (Offline)',
+            uri: 'pulse:user:local',
+          },
+          external_urls: {},
+          items: {
+            href: '',
+            total: resolved.length,
+            limit: resolved.length,
+            offset: 0,
+            next: null,
+            previous: null,
+            items: resolved.map((t) => ({
+              added_at: new Date(pl.updatedAt).toISOString(),
+              added_by_id: 'pulse-local',
+              is_local: true,
+              item: t,
+              usedLegacyTrackField: false,
+            })),
+          },
+          itemsRestrictedByDevMode: false,
+        };
+        useAchievementStore.getState().incrementMetric('playlistsOpened', 1);
+        setActivePlaylist(full);
+        return;
+      }
+    }
     const full = await getSpotifyClient().getPlaylist(playlistId);
     useAchievementStore.getState().incrementMetric('playlistsOpened', 1);
     setActivePlaylist(full);
@@ -285,6 +345,14 @@ export default function LibraryView() {
   const handleCreatePlaylist = async () => {
     const trimmed = newPlaylistName.trim();
     if (!trimmed) {
+      return;
+    }
+    if (!isConnected) {
+      const created = await createCustomPlaylist(trimmed);
+      useAchievementStore.getState().incrementMetric('playlistsCreated', 1);
+      setNewPlaylistName('');
+      await loadLibrary();
+      await openPlaylist(created.id);
       return;
     }
     const created = await getSpotifyClient().createPlaylist({ name: trimmed });
@@ -339,7 +407,7 @@ export default function LibraryView() {
         </div>
       </div>
 
-      {!isConnected && tab !== 'local' ? (
+      {!isConnected && tab !== 'local' && tab !== 'playlists' ? (
         <article className="pulse-card" style={{ marginBottom: '1.25rem' }}>
           <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem' }}>Spotify Account Not Connected</h2>
           <p style={{ color: 'var(--pulse-color-text-secondary)', margin: '0 0 1rem' }}>
@@ -501,13 +569,30 @@ export default function LibraryView() {
                   });
                   await openPlaylist(activePlaylist.id);
                 }}
-                onBulkSaveToLibrary={(uris) => getSpotifyClient().saveToLibrary(uris)}
-                onBulkAddToPlaylist={(destId, uris) =>
-                  getSpotifyClient().addItemsToPlaylist(destId, uris)
-                }
+                onBulkSaveToLibrary={async (uris) => {
+                  if (isConnected) {
+                    await getSpotifyClient().saveToLibrary(uris);
+                  }
+                }}
+                onBulkAddToPlaylist={async (destId, uris) => {
+                  if (destId.startsWith('pl_')) {
+                    for (const u of uris) {
+                      await addTrackToCustomPlaylist(destId, u);
+                    }
+                  } else {
+                    await getSpotifyClient().addItemsToPlaylist(destId, uris);
+                  }
+                }}
                 onBulkRemoveFromPlaylist={async (uris) => {
-                  await getSpotifyClient().removePlaylistItems(activePlaylist.id, uris);
-                  await openPlaylist(activePlaylist.id);
+                  if (activePlaylist.id.startsWith('pl_')) {
+                    for (const u of uris) {
+                      await removeTrackFromCustomPlaylist(activePlaylist.id, u);
+                    }
+                    await openPlaylist(activePlaylist.id);
+                  } else {
+                    await getSpotifyClient().removePlaylistItems(activePlaylist.id, uris);
+                    await openPlaylist(activePlaylist.id);
+                  }
                 }}
               />
             )}

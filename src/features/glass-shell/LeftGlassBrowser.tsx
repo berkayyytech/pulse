@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ArrowLeft, Disc3, Plus, Search } from 'lucide-react';
+import {
+  ArrowLeft,
+  Disc3,
+  ListPlus,
+  Play,
+  Plus,
+  Search,
+  Shuffle,
+  Trash2,
+} from 'lucide-react';
 import { getSpotifyClient } from '@/api/clientInstance';
 import { DEMO_TRACKS, DEMO_USER } from '@/api/demoCatalog';
 import type { Track } from '@/api/schemas/catalog';
@@ -10,12 +19,24 @@ import {
   getCuratedAndLocalTracks,
   importAudioFiles,
 } from '@/features/local-audio/localAudioService';
+import {
+  customPlaylistToSimplified,
+  deleteCustomPlaylist,
+  generatePlaylistCoverSvg,
+  getAllCustomPlaylists,
+  getCustomPlaylist,
+  removeTrackFromCustomPlaylist,
+  resolveCustomPlaylistTracks,
+} from '@/features/playlists/customPlaylistService';
+import { CreatePlaylistModal } from '@/features/playlists/CreatePlaylistModal';
+import { PlaylistSelectModal } from '@/features/playlists/PlaylistSelectModal';
 import { DevicePicker } from '@/features/player/DevicePicker';
 import { formatDurationMs } from '@/features/player/formatTime';
 import { playerController } from '@/features/player/playerController';
 import { useAchievementStore } from '@/stores/achievementStore';
 import { useAuthStore } from '@/stores/authStore';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useQueueStore } from '@/stores/queueStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { useUiStore } from '@/stores/uiStore';
 
@@ -37,6 +58,7 @@ export function LeftGlassBrowser() {
   const currentUser = useAuthStore((s) => s.user);
 
   const currentTrack = usePlayerStore((s) => s.currentTrack);
+  const isPlaying = usePlayerStore((s) => s.isPlaying);
   const activeDevice = usePlayerStore((s) => s.activeDevice);
   const density = useThemeStore((s) => s.density);
   const showTrackArtwork = useThemeStore((s) => s.showTrackArtwork);
@@ -54,6 +76,8 @@ export function LeftGlassBrowser() {
   const [openedPlaylist, setOpenedPlaylist] = useState<FullPlaylist | null>(null);
   const [statusNote, setStatusNote] = useState<string>('');
   const [devicePopoverOpen, setDevicePopoverOpen] = useState(false);
+  const [createPlaylistModalOpen, setCreatePlaylistModalOpen] = useState(false);
+  const [playlistSelectTrack, setPlaylistSelectTrack] = useState<Track | null>(null);
 
   const isConnected = authStatus === 'authenticated' || authStatus === 'demo';
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -96,10 +120,31 @@ export function LeftGlassBrowser() {
     }
   };
 
-  // Load saved library items when connected
+  const refreshCustomPlaylists = useCallback(async () => {
+    try {
+      const customList = await getAllCustomPlaylists();
+      const customConverted = customList.map(customPlaylistToSimplified);
+      if (!isConnected) {
+        setPlaylists(customConverted);
+      } else {
+        setPlaylists((prev) => {
+          const spotifyOnly = prev.filter((p) => !p.uri.startsWith('pulse:playlist:'));
+          return [...customConverted, ...spotifyOnly];
+        });
+      }
+    } catch {
+      // Ignore
+    }
+  }, [isConnected]);
+
+  // Load saved library items & custom playlists
   const refreshLibraryData = useCallback(async () => {
+    const customList = await getAllCustomPlaylists();
+    const customConverted = customList.map(customPlaylistToSimplified);
+
     if (!isConnected) {
       setSavedTracks([...DEMO_TRACKS]);
+      setPlaylists(customConverted);
       return;
     }
     const client = getSpotifyClient();
@@ -110,9 +155,8 @@ export function LeftGlassBrowser() {
     if (trkPage) {
       setSavedTracks(trkPage.items.map((item) => item.track));
     }
-    if (plPage) {
-      setPlaylists(plPage.items);
-    }
+    const spotifyPlaylists = plPage ? plPage.items : [];
+    setPlaylists([...customConverted, ...spotifyPlaylists]);
   }, [isConnected]);
 
   useEffect(() => {
@@ -218,6 +262,82 @@ export function LeftGlassBrowser() {
     void playerController.playTrack(track, contextUri);
   };
 
+  const handleOpenCustomPlaylist = async (playlistId: string) => {
+    const pl = await getCustomPlaylist(playlistId);
+    if (!pl) return;
+    const resolvedTracks = await resolveCustomPlaylistTracks(pl);
+    const full: FullPlaylist = {
+      id: pl.id,
+      name: pl.name,
+      description: pl.description || '',
+      collaborative: false,
+      public: true,
+      snapshot_id: `${pl.updatedAt}`,
+      uri: `pulse:playlist:${pl.id}`,
+      images: [
+        {
+          url: pl.coverUrl || generatePlaylistCoverSvg(pl.name, pl.trackUris.length),
+          height: 400,
+          width: 400,
+        },
+      ],
+      owner: { id: 'pulse-local', display_name: 'You (Offline)', uri: 'pulse:user:local' },
+      external_urls: {},
+      items: {
+        href: '',
+        total: resolvedTracks.length,
+        limit: resolvedTracks.length,
+        offset: 0,
+        next: null,
+        previous: null,
+        items: resolvedTracks.map((t) => ({
+          added_at: new Date(pl.updatedAt).toISOString(),
+          added_by_id: 'pulse-local',
+          is_local: true,
+          item: t,
+          usedLegacyTrackField: false,
+        })),
+      },
+      itemsRestrictedByDevMode: false,
+    };
+    setOpenedPlaylist(full);
+  };
+
+  const handleRemoveTrackFromCurrentPlaylist = async (trackUri: string) => {
+    if (!openedPlaylist || !openedPlaylist.uri.startsWith('pulse:playlist:')) return;
+    await removeTrackFromCustomPlaylist(openedPlaylist.id, trackUri);
+    await handleOpenCustomPlaylist(openedPlaylist.id);
+    await refreshCustomPlaylists();
+  };
+
+  const handleDeleteCurrentPlaylist = async () => {
+    if (!openedPlaylist || !openedPlaylist.uri.startsWith('pulse:playlist:')) return;
+    if (window.confirm(`Delete playlist "${openedPlaylist.name}"?`)) {
+      await deleteCustomPlaylist(openedPlaylist.id);
+      setOpenedPlaylist(null);
+      await refreshCustomPlaylists();
+    }
+  };
+
+  const handlePlayAll = () => {
+    if (displayedTracks.length === 0) return;
+    const first = displayedTracks[0];
+    if (first) {
+      handlePlayTrack(first, openedPlaylist?.uri);
+      useQueueStore.getState().setQueueItems(displayedTracks.slice(1));
+    }
+  };
+
+  const handleShufflePlaylist = () => {
+    if (displayedTracks.length === 0) return;
+    const shuffled = [...displayedTracks].sort(() => Math.random() - 0.5);
+    const first = shuffled[0];
+    if (first) {
+      handlePlayTrack(first, openedPlaylist?.uri);
+      useQueueStore.getState().setQueueItems(shuffled.slice(1));
+    }
+  };
+
   const showPlaylistsGrid =
     leftPaneTab === 'library' && libSubFilter === 'playlists' && openedPlaylist === null;
 
@@ -228,6 +348,9 @@ export function LeftGlassBrowser() {
     if (statusNote) {
       return statusNote;
     }
+    if (!isPlaying) {
+      return 'Nothing playing';
+    }
     if (authStatus === 'authenticated') {
       return `Playing on ${activeDevice?.name ?? 'Pulse'}`;
     }
@@ -235,7 +358,7 @@ export function LeftGlassBrowser() {
       return `Playing on ${activeDevice?.name ?? 'Pulse (Sample)'}`;
     }
     return 'Playing on Pulse';
-  }, [activeDevice?.name, authStatus, searching, statusNote]);
+  }, [activeDevice?.name, authStatus, isPlaying, searching, statusNote]);
 
   return (
     <aside className="gp-glass-panel gp-left-pane" aria-label="Music browser">
@@ -282,56 +405,125 @@ export function LeftGlassBrowser() {
           }}
         >
           {openedPlaylist ? (
-            <button
-              type="button"
-              className="gp-seg-pill"
-              data-active="true"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 12px' }}
-              onClick={() => {
-                setOpenedPlaylist(null);
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                gap: '8px',
               }}
             >
-              <ArrowLeft size={13} />
-              <span>{openedPlaylist.name}</span>
-            </button>
+              <button
+                type="button"
+                className="gp-seg-pill"
+                data-active="true"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '4px 12px',
+                  maxWidth: '220px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+                onClick={() => {
+                  setOpenedPlaylist(null);
+                }}
+              >
+                <ArrowLeft size={13} />
+                <span>{openedPlaylist.name}</span>
+              </button>
+
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  type="button"
+                  className="gp-action-pill"
+                  style={{ padding: '3px 9px', fontSize: '11px', gap: '4px' }}
+                  onClick={handlePlayAll}
+                  title="Play All"
+                >
+                  <Play size={11} />
+                  <span>Play All</span>
+                </button>
+                <button
+                  type="button"
+                  className="gp-round-btn"
+                  style={{ width: '26px', height: '26px' }}
+                  onClick={handleShufflePlaylist}
+                  title="Shuffle"
+                >
+                  <Shuffle size={12} />
+                </button>
+                {openedPlaylist.uri.startsWith('pulse:playlist:') ? (
+                  <button
+                    type="button"
+                    className="gp-round-btn"
+                    style={{ width: '26px', height: '26px' }}
+                    onClick={() => {
+                      void handleDeleteCurrentPlaylist();
+                    }}
+                    title="Delete custom playlist"
+                  >
+                    <Trash2 size={12} color="var(--pulse-color-danger)" />
+                  </button>
+                ) : null}
+              </div>
+            </div>
           ) : (
-            <div style={{ display: 'inline-flex', gap: '4px' }} role="tablist" aria-label="Library view">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={libSubFilter === 'tracks'}
-                className="gp-seg-pill"
-                style={{ padding: '4px 12px', fontSize: '12px' }}
-                onClick={() => {
-                  setLibSubFilter('tracks');
-                }}
-              >
-                Liked ({savedTracks.length})
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={libSubFilter === 'playlists'}
-                className="gp-seg-pill"
-                style={{ padding: '4px 12px', fontSize: '12px' }}
-                onClick={() => {
-                  setLibSubFilter('playlists');
-                }}
-              >
-                Playlists ({playlists.length})
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={libSubFilter === 'local'}
-                className="gp-seg-pill"
-                style={{ padding: '4px 12px', fontSize: '12px' }}
-                onClick={() => {
-                  setLibSubFilter('local');
-                }}
-              >
-                Local ({localTracks.length})
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              <div style={{ display: 'inline-flex', gap: '4px' }} role="tablist" aria-label="Library view">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={libSubFilter === 'tracks'}
+                  className="gp-seg-pill"
+                  style={{ padding: '4px 12px', fontSize: '12px' }}
+                  onClick={() => {
+                    setLibSubFilter('tracks');
+                  }}
+                >
+                  Liked ({savedTracks.length})
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={libSubFilter === 'playlists'}
+                  className="gp-seg-pill"
+                  style={{ padding: '4px 12px', fontSize: '12px' }}
+                  onClick={() => {
+                    setLibSubFilter('playlists');
+                  }}
+                >
+                  Playlists ({playlists.length})
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={libSubFilter === 'local'}
+                  className="gp-seg-pill"
+                  style={{ padding: '4px 12px', fontSize: '12px' }}
+                  onClick={() => {
+                    setLibSubFilter('local');
+                  }}
+                >
+                  Local ({localTracks.length})
+                </button>
+              </div>
+
+              {libSubFilter === 'playlists' ? (
+                <button
+                  type="button"
+                  className="pulse-nav-btn"
+                  style={{ width: 'auto', padding: '3px 8px', fontSize: '11px', gap: '3px' }}
+                  onClick={() => { setCreatePlaylistModalOpen(true); }}
+                  title="Create custom playlist"
+                >
+                  <Plus size={12} />
+                  <span>New</span>
+                </button>
+              ) : null}
             </div>
           )}
 
@@ -420,15 +612,35 @@ export function LeftGlassBrowser() {
       >
         {showPlaylistsGrid ? (
           playlists.length === 0 ? (
-            <p style={{ opacity: 0.6, padding: '12px 6px', fontSize: '13px' }}>
-              {isConnected
-                ? 'No playlists found yet.'
-                : 'Connect your Spotify Client ID in Settings (⚙) or click Sample Library to browse playlists.'}
-            </p>
+            <div style={{ textAlign: 'center', padding: '24px 12px', opacity: 0.75 }}>
+              <ListPlus size={28} style={{ margin: '0 auto 8px', display: 'block' }} color="var(--pulse-color-accent)" />
+              <div style={{ fontSize: '0.86rem', fontWeight: 600 }}>No Playlists Yet</div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--pulse-color-text-secondary)', marginTop: '4px', marginBottom: '10px' }}>
+                Create your own playlists with your uploaded music or curated tracks!
+              </div>
+              <button
+                type="button"
+                className="pulse-nav-btn"
+                style={{
+                  width: 'auto',
+                  margin: '0 auto',
+                  padding: '5px 12px',
+                  background: 'var(--pulse-color-accent)',
+                  color: 'var(--pulse-color-text-inverse)',
+                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                }}
+                onClick={() => { setCreatePlaylistModalOpen(true); }}
+              >
+                <Plus size={13} />
+                <span>Create Playlist</span>
+              </button>
+            </div>
           ) : (
             playlists.map((pl) => {
               const cover = pl.images[0]?.url ?? FALLBACK_THUMB;
-              const isOwned = currentUser?.id === pl.owner.id || pl.collaborative;
+              const isCustom = pl.uri.startsWith('pulse:playlist:');
+              const isOwned = isCustom || currentUser?.id === pl.owner.id || pl.collaborative;
               return (
                 <button
                   key={pl.id}
@@ -437,25 +649,29 @@ export function LeftGlassBrowser() {
                   aria-selected={false}
                   className="gp-track-row"
                   onClick={() => {
-                    useAchievementStore.getState().incrementMetric('playlistsOpened', 1);
-                    void getSpotifyClient()
-                      .getPlaylist(pl.id)
-                      .then((full) => {
-                        setOpenedPlaylist(full);
-                      })
-                      .catch(() => undefined);
+                    if (isCustom) {
+                      void handleOpenCustomPlaylist(pl.id);
+                    } else {
+                      useAchievementStore.getState().incrementMetric('playlistsOpened', 1);
+                      void getSpotifyClient()
+                        .getPlaylist(pl.id)
+                        .then((full) => {
+                          setOpenedPlaylist(full);
+                        })
+                        .catch(() => undefined);
+                    }
                   }}
                 >
                   <img src={cover} alt="" className="gp-thumb" loading="lazy" />
                   <span className="gp-track-meta">
                     <span className="gp-track-title">{pl.name}</span>
                     <span className="gp-track-artist">
-                      {pl.owner.display_name ?? pl.owner.id}
+                      {isCustom ? 'Custom Playlist (Offline)' : (pl.owner.display_name ?? pl.owner.id)}
                       {!isOwned ? ' • Editorial' : ''}
                     </span>
                   </span>
                   <span className="gp-track-duration">
-                    {pl.itemsSummary ? `${pl.itemsSummary.total}` : '—'}
+                    {pl.itemsSummary ? `${pl.itemsSummary.total} ${pl.itemsSummary.total === 1 ? 'song' : 'songs'}` : '—'}
                   </span>
                 </button>
               );
@@ -514,7 +730,49 @@ export function LeftGlassBrowser() {
                       {track.artists.map((a) => a.name).join(', ')}
                     </span>
                   </span>
-                  <span className="gp-track-duration">{formatDurationMs(track.duration_ms)}</span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="gp-track-duration">{formatDurationMs(track.duration_ms)}</span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      title="Add to Playlist"
+                      aria-label={`Add ${track.name} to playlist`}
+                      style={{ padding: '3px', borderRadius: '4px', opacity: 0.65, cursor: 'pointer', display: 'inline-flex' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPlaylistSelectTrack(track);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.stopPropagation();
+                          setPlaylistSelectTrack(track);
+                        }
+                      }}
+                    >
+                      <Plus size={13} />
+                    </span>
+                    {openedPlaylist?.uri.startsWith('pulse:playlist:') ? (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        title="Remove from playlist"
+                        aria-label={`Remove ${track.name} from playlist`}
+                        style={{ padding: '3px', borderRadius: '4px', opacity: 0.65, cursor: 'pointer', display: 'inline-flex' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleRemoveTrackFromCurrentPlaylist(track.uri);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.stopPropagation();
+                            void handleRemoveTrackFromCurrentPlaylist(track.uri);
+                          }
+                        }}
+                      >
+                        <Trash2 size={13} color="var(--pulse-color-danger)" />
+                      </span>
+                    ) : null}
+                  </div>
                 </button>
               );
             })}
@@ -542,7 +800,49 @@ export function LeftGlassBrowser() {
                     {track.artists.map((a) => a.name).join(', ')}
                   </span>
                 </span>
-                <span className="gp-track-duration">{formatDurationMs(track.duration_ms)}</span>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <span className="gp-track-duration">{formatDurationMs(track.duration_ms)}</span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    title="Add to Playlist"
+                    aria-label={`Add ${track.name} to playlist`}
+                    style={{ padding: '3px', borderRadius: '4px', opacity: 0.65, cursor: 'pointer', display: 'inline-flex' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPlaylistSelectTrack(track);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation();
+                        setPlaylistSelectTrack(track);
+                      }
+                    }}
+                  >
+                    <Plus size={13} />
+                  </span>
+                  {openedPlaylist?.uri.startsWith('pulse:playlist:') ? (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      title="Remove from playlist"
+                      aria-label={`Remove ${track.name} from playlist`}
+                      style={{ padding: '3px', borderRadius: '4px', opacity: 0.65, cursor: 'pointer', display: 'inline-flex' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleRemoveTrackFromCurrentPlaylist(track.uri);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.stopPropagation();
+                          void handleRemoveTrackFromCurrentPlaylist(track.uri);
+                        }
+                      }}
+                    >
+                      <Trash2 size={13} color="var(--pulse-color-danger)" />
+                    </span>
+                  ) : null}
+                </div>
               </button>
             );
           })
@@ -557,8 +857,6 @@ export function LeftGlassBrowser() {
             if (isConnected) {
               useAchievementStore.getState().setFlag('openedDevicePicker');
               setDevicePopoverOpen((v) => !v);
-            } else {
-              setActiveRoute('setup');
             }
           }}
           style={{
@@ -572,7 +870,12 @@ export function LeftGlassBrowser() {
             gap: '6px',
           }}
         >
-          <Disc3 size={13} style={{ opacity: 0.7 }} aria-hidden="true" />
+          <Disc3
+            size={13}
+            style={{ opacity: isPlaying ? 0.95 : 0.45 }}
+            className={isPlaying ? 'gp-spin-slow' : undefined}
+            aria-hidden="true"
+          />
           <span>{footerLabel}</span>
         </button>
 
@@ -610,6 +913,31 @@ export function LeftGlassBrowser() {
           </div>
         ) : null}
       </div>
+
+      <CreatePlaylistModal
+        isOpen={createPlaylistModalOpen}
+        onClose={() => { setCreatePlaylistModalOpen(false); }}
+        onCreated={(newPl) => {
+          void (async () => {
+            await refreshCustomPlaylists();
+            await handleOpenCustomPlaylist(newPl.id);
+          })();
+        }}
+      />
+
+      <PlaylistSelectModal
+        track={playlistSelectTrack}
+        isOpen={playlistSelectTrack !== null}
+        onClose={() => { setPlaylistSelectTrack(null); }}
+        onUpdated={() => {
+          void (async () => {
+            await refreshCustomPlaylists();
+            if (openedPlaylist?.uri.startsWith('pulse:playlist:')) {
+              await handleOpenCustomPlaylist(openedPlaylist.id);
+            }
+          })();
+        }}
+      />
     </aside>
   );
 }

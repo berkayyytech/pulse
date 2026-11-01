@@ -87,10 +87,10 @@ export function CompactNowPlayingView({ mode }: CompactPlayerProps) {
             textOverflow: 'ellipsis',
           }}
         >
-          {currentTrack?.name ?? 'Waiting for Spotify playback…'}
+          {currentTrack?.name ?? 'Nothing playing'}
         </div>
         <div style={{ fontSize: '0.85rem', color: 'var(--pulse-color-text-secondary)' }}>
-          {currentTrack?.artists.map((a) => a.name).join(', ') ?? 'Pulse'}
+          {currentTrack?.artists.map((a) => a.name).join(', ') ?? 'Pick a track from the list'}
         </div>
         <div
           style={{

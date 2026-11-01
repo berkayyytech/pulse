@@ -10,7 +10,7 @@ describe('Pulse Customizable Shell, Non-Glass Themes & Accessibility', () => {
 
     expect(screen.getByRole('link', { name: /skip to main content/i })).toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: /search songs or artists/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /midnight (oscillations|rainfall)/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /nothing playing/i })).toBeInTheDocument();
 
     // Open top-right Settings overlay
     await user.click(screen.getByRole('button', { name: /open settings/i }));

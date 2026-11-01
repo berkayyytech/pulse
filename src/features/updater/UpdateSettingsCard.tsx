@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowUpCircle, Download, ExternalLink, RefreshCw } from 'lucide-react';
-import { isValidGithubRepoSlug } from '@/features/updater/updaterService';
+import { isValidGithubRepoSlug, normalizeGithubRepoSlug } from '@/features/updater/updaterService';
 import { openExternalUrl } from '@/platform/openExternal';
 import { isTauriRuntime } from '@/platform/runtime';
 import { useUpdaterStore } from '@/stores/updaterStore';
@@ -187,8 +187,9 @@ export function UpdateSettingsCard() {
               onChange={(e) => {
                 const val = e.target.value;
                 setRepoDraft(val);
-                if (isValidGithubRepoSlug(val)) {
-                  setRepoSlug(val);
+                const normalized = normalizeGithubRepoSlug(val);
+                if (isValidGithubRepoSlug(normalized)) {
+                  setRepoSlug(normalized);
                 }
               }}
               style={{

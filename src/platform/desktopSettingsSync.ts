@@ -3,6 +3,7 @@ import { useShortcutStore } from '@/features/command-palette/shortcutRegistry';
 import { startSandboxedPluginWorker } from '@/features/plugins/pluginSandboxHost';
 import {
   pulseDb,
+  type CustomPlaylistRecord,
   type SmartPlaylistRecord,
   type ThemePackRecord,
 } from '@/storage/db';
@@ -33,6 +34,7 @@ export interface DesktopSettingsBundle {
   readonly storage: Readonly<Record<string, string | null>>;
   readonly customThemes: readonly ThemePackRecord[];
   readonly smartPlaylists: readonly SmartPlaylistRecord[];
+  readonly customPlaylists?: readonly CustomPlaylistRecord[];
 }
 
 let hydrationFinished = false;
@@ -77,9 +79,10 @@ export async function buildDesktopSettingsBundle(): Promise<DesktopSettingsBundl
     }
   }
 
-  const [customThemes, smartPlaylists] = await Promise.all([
+  const [customThemes, smartPlaylists, customPlaylists] = await Promise.all([
     pulseDb.customThemes.toArray().catch(() => [] as ThemePackRecord[]),
     pulseDb.smartPlaylists.toArray().catch(() => [] as SmartPlaylistRecord[]),
+    pulseDb.customPlaylists.toArray().catch(() => [] as CustomPlaylistRecord[]),
   ]);
 
   return {
@@ -88,6 +91,7 @@ export async function buildDesktopSettingsBundle(): Promise<DesktopSettingsBundl
     storage: storageSnapshot,
     customThemes,
     smartPlaylists,
+    customPlaylists,
   };
 }
 
@@ -159,6 +163,11 @@ export async function hydrateDesktopSettingsFromDisk(): Promise<string | null> {
       if (Array.isArray(parsed.smartPlaylists) && parsed.smartPlaylists.length > 0) {
         await pulseDb.smartPlaylists
           .bulkPut(parsed.smartPlaylists as SmartPlaylistRecord[])
+          .catch(() => undefined);
+      }
+      if (Array.isArray(parsed.customPlaylists) && parsed.customPlaylists.length > 0) {
+        await pulseDb.customPlaylists
+          .bulkPut(parsed.customPlaylists as CustomPlaylistRecord[])
           .catch(() => undefined);
       }
 

@@ -126,7 +126,7 @@ export function NowPlayingBar() {
               textOverflow: 'ellipsis',
             }}
           >
-            {currentTrack ? currentTrack.name : 'No active track'}
+            {currentTrack ? currentTrack.name : 'Nothing playing'}
           </div>
           <div
             style={{
@@ -139,7 +139,7 @@ export function NowPlayingBar() {
           >
             {currentTrack
               ? currentTrack.artists.map((a) => a.name).join(', ')
-              : 'Select a track or transfer Spotify Connect'}
+              : 'Pick a track from the list'}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '2px' }}>
             {spotifyUrl ? (

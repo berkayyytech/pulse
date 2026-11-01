@@ -8,8 +8,17 @@ export const DEFAULT_UPDATE_REPO = 'berkayyytech/pulse';
 
 const REPO_SLUG_REGEX = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
+export function normalizeGithubRepoSlug(raw: string): string {
+  const trimmed = raw.trim();
+  const cleaned = trimmed
+    .replace(/^https?:\/\/github\.com\//i, '')
+    .replace(/\.git$/i, '')
+    .replace(/\/+$/, '');
+  return cleaned;
+}
+
 export function isValidGithubRepoSlug(slug: string): boolean {
-  return REPO_SLUG_REGEX.test(slug.trim());
+  return REPO_SLUG_REGEX.test(normalizeGithubRepoSlug(slug));
 }
 
 export function getBundledAppVersion(): string {
@@ -189,7 +198,8 @@ export async function checkForGitHubReleaseUpdate(options: {
   readonly includePrereleases?: boolean;
   readonly fetchImpl?: typeof fetch;
 }): Promise<UpdateCheckResult> {
-  const slug = options.repoSlug.trim();
+  const rawSlug = options.repoSlug.trim();
+  const slug = normalizeGithubRepoSlug(rawSlug);
   if (!isValidGithubRepoSlug(slug)) {
     throw new Error('Enter a valid GitHub repository in owner/repo format (e.g. berkayyytech/pulse).');
   }
@@ -212,6 +222,47 @@ export async function checkForGitHubReleaseUpdate(options: {
       outcome: 'no-releases-published',
       currentVersion,
     };
+  }
+
+  if (response.status === 403) {
+    try {
+      const rawPkgRes = await fetcher(
+        `https://raw.githubusercontent.com/${slug}/main/package.json`,
+      );
+      if (rawPkgRes.ok) {
+        const pkgData = (await rawPkgRes.json()) as { version?: string };
+        const latestVersion = pkgData.version ? pkgData.version.trim() : null;
+        if (latestVersion && isNewerSemver(currentVersion, latestVersion)) {
+          return {
+            outcome: 'update-available',
+            currentVersion,
+            release: {
+              version: latestVersion,
+              tagName: `v${latestVersion}`,
+              title: `Pulse v${latestVersion}`,
+              notesSummary: 'New update available from GitHub repository.',
+              htmlUrl: `https://github.com/${slug}/releases`,
+              publishedAtIso: null,
+              prerelease: false,
+              windowsInstaller: {
+                name: `Pulse_${latestVersion}_x64-setup.exe`,
+                downloadUrl: `https://github.com/${slug}/releases/download/v${latestVersion}/Pulse_${latestVersion}_x64-setup.exe`,
+                sizeBytes: 0,
+                sha256: null,
+              },
+            },
+          };
+        } else if (latestVersion) {
+          return {
+            outcome: 'up-to-date',
+            currentVersion,
+            latestVersion,
+          };
+        }
+      }
+    } catch {
+      // Fall through to error
+    }
   }
 
   if (!response.ok) {

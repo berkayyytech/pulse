@@ -196,6 +196,20 @@ export const playerController = {
     useAchievementStore.getState().incrementMetric('pauseToggles', 1);
     const store = usePlayerStore.getState();
 
+    if (!store.currentTrack) {
+      const queuedLocal = useQueueStore.getState().shiftNextTrack();
+      if (queuedLocal) {
+        await this.playTrack(queuedLocal);
+        return;
+      }
+      const localList = await getCuratedAndLocalTracks();
+      const first = localList[0];
+      if (first) {
+        await this.playTrack(first);
+        return;
+      }
+    }
+
     if (store.engine === 'html-audio' || isLocalOrCuratedTrack(store.currentTrack)) {
       if (store.isPlaying) {
         htmlAudioEngine.pause();
@@ -236,11 +250,20 @@ export const playerController = {
       return;
     }
 
+    if (!store.currentTrack) {
+      const localList = await getCuratedAndLocalTracks();
+      const first = localList[0];
+      if (first) {
+        await this.playTrack(first);
+      }
+      return;
+    }
+
     if (store.engine === 'html-audio' || isLocalOrCuratedTrack(store.currentTrack)) {
       const localList = await getCuratedAndLocalTracks();
       if (localList.length === 0) return;
 
-      if (store.repeatMode === 'track' && store.currentTrack) {
+      if (store.repeatMode === 'track') {
         await this.playTrack(store.currentTrack);
         return;
       }
@@ -277,6 +300,15 @@ export const playerController = {
   async previous(): Promise<void> {
     useAchievementStore.getState().incrementMetric('skipPrevCount', 1);
     const store = usePlayerStore.getState();
+
+    if (!store.currentTrack) {
+      const localList = await getCuratedAndLocalTracks();
+      const first = localList[0];
+      if (first) {
+        await this.playTrack(first);
+      }
+      return;
+    }
 
     if (store.engine === 'html-audio' || isLocalOrCuratedTrack(store.currentTrack)) {
       if (store.positionMs > 3000) {
@@ -393,6 +425,20 @@ export const playerController = {
     await getSpotifyClient().transferPlayback(deviceId, store.isPlaying);
     store.setEngine(deviceId === store.sdkDeviceId ? 'sdk' : 'connect-remote');
     await this.refreshPlaybackState();
+  },
+
+  stop(): void {
+    htmlAudioEngine.stop();
+    const sdk = getActiveSdkPlayer();
+    const store = usePlayerStore.getState();
+    if (sdk && store.isPlaying) {
+      void sdk.togglePlay().catch(() => undefined);
+    }
+    usePlayerStore.getState().setPlaybackSnapshot({
+      currentTrack: null,
+      isPlaying: false,
+      positionMs: 0,
+    });
   },
 };
 

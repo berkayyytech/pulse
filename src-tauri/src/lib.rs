@@ -157,6 +157,7 @@ fn is_allowed_update_host(host: &str) -> bool {
         "github.com"
             | "objects.githubusercontent.com"
             | "release-assets.githubusercontent.com"
+            | "raw.githubusercontent.com"
     )
 }
 
