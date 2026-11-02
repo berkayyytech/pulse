@@ -17,6 +17,7 @@ const VAULT_REFRESH_TOKEN_KEY = 'spotify_refresh_token';
 const VAULT_PKCE_VERIFIER_KEY = 'spotify_pkce_verifier';
 const SESSION_STATE_KEY = 'pulse.pkce.state';
 const SESSION_REDIRECT_KEY = 'pulse.pkce.redirectUri';
+const SESSION_VERIFIER_KEY = 'pulse.pkce.verifier';
 
 const TokenEndpointResponseSchema = z.object({
   access_token: z.string().min(1),
@@ -82,6 +83,7 @@ export async function startPkceLogin(options?: {
 
   const vault = getTokenVault();
   await vault.setSecret(VAULT_PKCE_VERIFIER_KEY, verifier);
+  sessionStorage.setItem(SESSION_VERIFIER_KEY, verifier);
   sessionStorage.setItem(SESSION_STATE_KEY, state);
   sessionStorage.setItem(SESSION_REDIRECT_KEY, redirectCheck.uri);
 
@@ -142,7 +144,8 @@ export async function completePkceCallback(params: {
       throw new Error('Missing Spotify Client ID during callback exchange.');
     }
 
-    const codeVerifier = await vault.getSecret(VAULT_PKCE_VERIFIER_KEY);
+    const codeVerifier =
+      (await vault.getSecret(VAULT_PKCE_VERIFIER_KEY)) ?? sessionStorage.getItem(SESSION_VERIFIER_KEY);
     if (!codeVerifier) {
       throw new Error('Missing PKCE code_verifier in vault. Start sign-in again.');
     }
@@ -156,7 +159,7 @@ export async function completePkceCallback(params: {
         code: params.code,
         redirect_uri: redirectUri,
         code_verifier: codeVerifier,
-      }),
+      }).toString(),
     });
 
     if (!response.ok) {
@@ -174,6 +177,7 @@ export async function completePkceCallback(params: {
       await vault.setSecret(VAULT_REFRESH_TOKEN_KEY, tokenData.refresh_token);
     }
     await vault.deleteSecret(VAULT_PKCE_VERIFIER_KEY);
+    sessionStorage.removeItem(SESSION_VERIFIER_KEY);
     sessionStorage.removeItem(SESSION_STATE_KEY);
     sessionStorage.removeItem(SESSION_REDIRECT_KEY);
 
@@ -210,7 +214,7 @@ export async function refreshSpotifyAccessToken(): Promise<string | null> {
           grant_type: 'refresh_token',
           refresh_token: refreshToken,
           client_id: clientId,
-        }),
+        }).toString(),
       });
 
       if (!response.ok) {
@@ -262,6 +266,9 @@ export async function signOutSpotify(removeClientId = false): Promise<void> {
   const vault = getTokenVault();
   await vault.deleteSecret(VAULT_REFRESH_TOKEN_KEY);
   await vault.deleteSecret(VAULT_PKCE_VERIFIER_KEY);
+  sessionStorage.removeItem(SESSION_VERIFIER_KEY);
+  sessionStorage.removeItem(SESSION_STATE_KEY);
+  sessionStorage.removeItem(SESSION_REDIRECT_KEY);
   if (removeClientId) {
     useAuthStore.getState().setClientId(null);
   } else {
