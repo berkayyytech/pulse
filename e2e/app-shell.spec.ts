@@ -9,7 +9,7 @@ test('Pulse customizable user journey: Non-Glass Themes (Matte / Brutalist / CRT
   // 1. Verify initial shell on launch
   await expect(page.getByRole('searchbox', { name: /search songs or artists/i })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Import' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Midnight Oscillations' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /nothing playing/i })).toBeVisible();
 
   // 2. Open Settings & switch across Frutiger Aero 2007, Pitch Matte Studio & Neo-Brutalist Zine
   await page.getByRole('button', { name: /open settings/i }).click();
